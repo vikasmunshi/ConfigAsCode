@@ -1,5 +1,5 @@
 {
-    "id": "17573f6b-9fed-5438-a685-6ba3b03fc5e5",
+    "id": "85ad27f0-c006-574e-a919-d44fecb34e16",
     "name": "test policy 2",
     "version": "1",
     "doc": "test doc 1",
@@ -7,6 +7,8 @@
     "namespace": "test2",
     "type": "PolicyExemption",
     "exempted": {
-        "param11": "val00"
+        "param11": [
+            "val00"
+        ]
     }
 }

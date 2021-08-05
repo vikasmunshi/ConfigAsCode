@@ -13,9 +13,9 @@ from pathlib import Path
 from typing import Dict, Generator, Optional, Set, Tuple, Type, TypeVar
 from uuid import NAMESPACE_URL, uuid5
 
-from frozen import FrozenDict
+from Frozen import FrozenDict
 
-__all__ = ['Config', 'Policy', 'PolicyExemption', 'PolicySet', 'PolicyViolation']
+__all__ = ['Config', 'FrozenDict', 'Policy', 'PolicyExemption', 'PolicySet', 'PolicyViolation']
 
 T = TypeVar('T', bound='BasePolicy')
 
@@ -65,13 +65,17 @@ class BasePolicy:
                 return
         if fix and policy_data['namespace'] != file.parent.stem:
             policy_data['namespace'] = file.parent.stem
-        try:
-            obj = cls.from_dict(policy_data)
-        except AttributeError:
-            return
+        obj = cls.from_dict(policy_data)
         if fix and (policy_data.get('id') != obj.id or policy_data['namespace'] != file.parent.stem):
             obj.dump(file)
         return obj
+
+    @classmethod
+    def safe_load(cls: Type[T], file: Path, fix: bool = False) -> Optional[T]:
+        try:
+            return cls.load(file, fix)
+        except (KeyError, PolicyViolation) as e:
+            print('ignored', file.name, e)
 
     @staticmethod
     @lru_cache()
@@ -84,7 +88,7 @@ class BasePolicy:
                     yield file
 
         return {policy.id: policy for file in ls_dir(path or Path(__file__).parent.parent.joinpath('repository'))
-                if (policy := BasePolicy.load(file=file, fix=fix))}
+                if (policy := BasePolicy.safe_load(file=file, fix=fix))}
 
     @classmethod
     def reload_policy_map(cls) -> None:
@@ -97,8 +101,8 @@ class BasePolicy:
         cls.policy_map(fix=True)
 
     @classmethod
-    def get_policy_by_id(cls: Type[T], policy_id: str) -> Optional[T]:
-        return cls.policy_map().get(policy_id, None)
+    def get_policy_by_id(cls: Type[T], policy_id: str) -> T:
+        return cls.policy_map()[policy_id]
 
 
 @dataclass(frozen=True)
@@ -162,7 +166,7 @@ class Policy(BasePolicy):
 
     def __sub__(self: Policy, other: PolicyExemption) -> Policy:
         if (not isinstance(self, Policy)) or (not isinstance(other, PolicyExemption)):
-            raise PolicyViolation('Cannot exempt type {} by {}'.format(type(self).name, type(other).name))
+            raise PolicyViolation('Cannot exempt type {} by {}'.format(type(self), type(other)))
         if self.target != other.target:
             raise PolicyViolation('Cannot exempt target {} with {}'.format(self.target, other.target))
 
@@ -230,7 +234,7 @@ class PolicySet(BasePolicy):
     @cached_property
     def policy(self) -> Policy:
         policies = [Policy.get_policy_by_id(policy_id) for policy_id in self.policies]
-        exemptions = [Policy.get_policy_by_id(policy_id) for policy_id in self.exemptions]
+        exemptions = [PolicyExemption.get_policy_by_id(exemption_id) for exemption_id in self.exemptions]
         return reduce(lambda x, y: x - y, exemptions, reduce(lambda x, y: x + y, policies))
 
 
@@ -299,7 +303,6 @@ class Config(BasePolicy):
 
 
 if __name__ == '__main__':
-    BasePolicy.reload_policy_map()
-    for pid, p in BasePolicy.policy_map().items():
+    for pid, p in BasePolicy.policy_map(fix=True).items():
         print(pid, p)
-        p.policy_map()
+    print(PolicySet.get_policy_by_id('3787f205-c35b-5f46-a5b6-229de8f17dc3').policy)

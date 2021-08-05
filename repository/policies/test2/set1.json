@@ -1,0 +1,16 @@
+{
+    "id": "3787f205-c35b-5f46-a5b6-229de8f17dc3",
+    "name": "test set 2",
+    "version": "1",
+    "doc": "test doc 1",
+    "target": "https://test.com",
+    "namespace": "test2",
+    "type": "PolicySet",
+    "policies": [
+        "4fae067a-f2e4-513b-a34e-0a7fd4959b19",
+        "c78b75ef-6dc8-5092-bf42-e9493d26a74d"
+    ],
+    "exemptions": [
+        "85ad27f0-c006-574e-a919-d44fecb34e16"
+    ]
+}

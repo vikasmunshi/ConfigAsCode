@@ -1,5 +1,5 @@
 #!/usr/bin/env python3.9
 # -*- coding: utf-8 -*-
-from policy import *
+from Policy import *
 
-__all__ = ['Policy', 'PolicyExemption', 'PolicySet', 'PolicyViolation']
+__all__ = ['Config', 'FrozenDict', 'Policy', 'PolicyExemption', 'PolicySet', 'PolicyViolation']
