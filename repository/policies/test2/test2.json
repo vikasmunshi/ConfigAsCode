@@ -1,5 +1,5 @@
 {
-    "id": "5f32d6df-6a84-56b0-ad38-c82670770963",
+    "id": "4fae067a-f2e4-513b-a34e-0a7fd4959b19",
     "name": "test policy 2",
     "version": "1",
     "doc": "test doc 1",
@@ -18,6 +18,7 @@
         ]
     },
     "enforced": {},
+    "required": [],
     "possible": [
         "param11",
         "param12",
