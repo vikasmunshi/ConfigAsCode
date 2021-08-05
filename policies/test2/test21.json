@@ -1,0 +1,12 @@
+{
+    "id": "17573f6b-9fed-5438-a685-6ba3b03fc5e5",
+    "name": "test policy 2",
+    "version": "1",
+    "doc": "test doc 1",
+    "target": "https://test.com",
+    "namespace": "test2",
+    "type": "PolicyExemption",
+    "exempted": {
+        "param11": "val00"
+    }
+}

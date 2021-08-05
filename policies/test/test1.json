@@ -1,0 +1,26 @@
+{
+    "id": "ff2fd0d3-7f9e-5f88-ace5-33931cfa938d",
+    "name": "test policy 1",
+    "version": "1",
+    "doc": "test doc 1",
+    "target": "https://test.com",
+    "namespace": "test",
+    "type": "Policy",
+    "allowed": {
+        "param11": [
+            "val11",
+            "val12"
+        ]
+    },
+    "blocked": {
+        "param11": [
+            "val00"
+        ]
+    },
+    "enforced": {},
+    "possible": [
+        "param11",
+        "param12",
+        "param13"
+    ]
+}
