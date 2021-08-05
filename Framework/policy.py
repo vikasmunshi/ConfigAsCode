@@ -7,15 +7,15 @@ from __future__ import annotations
 from __future__ import print_function
 
 from dataclasses import asdict, dataclass
-from functools import cached_property, lru_cache
+from functools import cache, cached_property
 from json import JSONDecodeError, dump, load
 from pathlib import Path
-from typing import Dict, Generator, Optional, Set, TypeVar, Tuple, Union
+from typing import Dict, Generator, Optional, Set, Tuple, Type, TypeVar
 from uuid import NAMESPACE_URL, uuid5
 
 from frozen import FrozenDict
 
-__all__ = ['Config', 'ConfigSet', 'Policy', 'PolicyExemption', 'PolicySet', 'PolicyViolation']
+__all__ = ['Config', 'Policy', 'PolicyExemption', 'PolicySet', 'PolicyViolation']
 
 T = TypeVar('T', bound='BasePolicy')
 
@@ -52,7 +52,7 @@ class BasePolicy:
             dump(policy_data, out_file, indent=4)
 
     @classmethod
-    def load(cls, file: Path, fix: bool = False) -> Optional[Union[BasePolicy, Policy, PolicyExemption, PolicySet]]:
+    def load(cls: Type[T], file: Path, fix: bool = False) -> Optional[T]:
         with open(file) as in_file:
             try:
                 policy_data = load(in_file)
@@ -67,9 +67,8 @@ class BasePolicy:
         return obj
 
     @staticmethod
-    @lru_cache()
-    def policy_map(path: Path = None, fix: bool = False, refresh_token: str = '') \
-            -> Dict[str, Union[BasePolicy, Policy, PolicyExemption, PolicySet]]:
+    @cache
+    def policy_map(path: Path = None, fix: bool = False) -> Dict[str, T]:
         def ls_dir(dir_path: Path) -> Generator[Path]:
             for file in dir_path.iterdir():
                 if file.is_dir():
@@ -77,10 +76,22 @@ class BasePolicy:
                 else:
                     yield file
 
-        if refresh_token:
-            pass
-        return {policy.id: policy for file in ls_dir(path or Path(__file__).parent.parent.joinpath('policies'))
+        return {policy.id: policy for file in ls_dir(path or Path(__file__).parent.parent.joinpath('repository'))
                 if (policy := BasePolicy.load(file=file, fix=fix))}
+
+    @classmethod
+    def reload_policy_map(cls) -> None:
+        cls.policy_map.cache_clear()
+        cls.policy_map()
+
+    @classmethod
+    def reset_repository(cls) -> None:
+        cls.policy_map.cache_clear()
+        cls.policy_map(fix=True)
+
+    @classmethod
+    def get_policy_by_id(cls: Type[T], policy_id: str) -> Optional[T]:
+        return cls.policy_map().get(policy_id, None)
 
 
 @dataclass(frozen=True)
@@ -133,17 +144,17 @@ class Policy(BasePolicy):
                        for param, value in assigned.items())
 
     def violations(self, assigned: FrozenDict[str, str]) -> Tuple[str]:
-        violations = tuple()
+        v = tuple()
         for param, value in assigned.items():
             if value not in self.allowed.get(param, (value,)):
-                violations += '"{}"="{}" not allowed, allowed values are: {}'.format(param, value, self.allowed[param])
+                v += '"{}"="{}" not allowed, allowed values are: {}'.format(param, value, self.allowed[param]),
             if value in self.blocked.get(param, tuple()):
-                violations += '"{}"="{}" is blocked, blocked values are: {}'.format(param, value, self.blocked[param])
+                v += '"{}"="{}" is blocked, blocked values are: {}'.format(param, value, self.blocked[param]),
             if value != self.enforced.get(param, value):
-                violations += '"{}"="{}" is enforced to be "{}"'.format(param, value, self.enforced[param])
+                v += '"{}"="{}" is enforced to be "{}"'.format(param, value, self.enforced[param]),
             if param not in (self.possible or (param,)):
-                violations += 'param "{}" is not possible, possible params are: {}'.format(param, self.possible)
-        return violations
+                v += 'param "{}" is not possible, possible params are: {}'.format(param, self.possible),
+        return v
 
 
 @dataclass(frozen=True)
@@ -175,21 +186,6 @@ class PolicySet(BasePolicy):
 
 @dataclass(frozen=True)
 class Config(BasePolicy):
-    assigned: FrozenDict[str, str]
-    applicable: Tuple[str]
-
-    @staticmethod
-    def param_map(data: dict) -> dict:
-        return dict(BasePolicy.param_map(data), **{'assigned': tuple(data.get('assigned', [])),
-                                                   'applicable': tuple(data.get('applicable', [])), })
-
-    @cached_property
-    def config(self) -> FrozenDict[str, str]:
-        return FrozenDict({})
-
-
-@dataclass(frozen=True)
-class ConfigSet(BasePolicy):
     assigned: FrozenDict[str, FrozenDict[str, str]]
     applicable: FrozenDict[str, Tuple[str]]
 
@@ -199,11 +195,38 @@ class ConfigSet(BasePolicy):
                                                    'applicable': FrozenDict(data.get('applicable', {})), })
 
     @cached_property
+    def policy(self) -> FrozenDict[str, Policy]:
+        return FrozenDict({})
+
+    @cached_property
     def config(self) -> FrozenDict[str, FrozenDict[str, str]]:
         return FrozenDict({})
 
+    @cached_property
+    def is_consistent(self) -> bool:
+        return not any((target not in self.policy or not self.policy[target].is_consistent)
+                       for target in self.config.keys())
+
+    @cached_property
+    def validate(self) -> bool:
+        return (not self.is_consistent) and \
+               (not any(not self.policy[target].validate(assigned) for target, assigned in self.config.items()))
+
+    @cached_property
+    def violations(self) -> Tuple[str]:
+        if self.validate:
+            return tuple()
+        v = tuple()
+        for target, assigned in self.config.items():
+            if target not in self.policy:
+                v += 'policy not defined for target {}'.format(target),
+            else:
+                v += self.policy[target].violations(assigned)
+        return v
+
 
 if __name__ == '__main__':
+    BasePolicy.reload_policy_map()
     for pid, p in BasePolicy.policy_map().items():
         print(pid, p)
         p.policy_map()
