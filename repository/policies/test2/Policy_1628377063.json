@@ -1,0 +1,19 @@
+{
+    "id": "test2:b9cf09b1-5fef-5e05-b616-82ef185b3282",
+    "name": "<policy name here>",
+    "version": "<1628377063 replace with version>",
+    "doc": "https://documentation.link",
+    "target": "<target url or name here>",
+    "namespace": "test2",
+    "type": "Policy",
+    "allowed": {
+        "param11": [
+            "val00"
+        ]
+    },
+    "blocked": {},
+    "enforced": {},
+    "required": [],
+    "possible": [],
+    "ts": "1628377089"
+}

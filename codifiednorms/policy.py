@@ -10,8 +10,8 @@ import itertools
 import json
 import os
 import pathlib
-import uuid
 import time
+import uuid
 
 try:
     from .freezer import *
@@ -76,35 +76,44 @@ class BasePolicy:
     def proper_name(self) -> str:
         return f'{self.name} v{self.version}' if self.version else self.name
 
+    @functools.cached_property
+    def is_empty(self) -> bool:
+        fields = set(field.name for field in dataclasses.fields(self.__class__)) - \
+                 set(field.name for field in dataclasses.fields(BasePolicy))
+        return all(not getattr(self, field) for field in fields) if fields else False
+
     def dump(self, file: pathlib.Path) -> None:
         with open(file, 'w') as out_file:
             json.dump(self.as_dict, out_file, indent=4)
 
     @classmethod
-    def from_dict(cls: typing.Type[T], data: typing.Dict) -> typing.Optional[T]:
+    def from_dict(cls: typing.Type[T], data: typing.Dict, register: bool = True) -> typing.Optional[T]:
         if data['type'] == cls.__name__:
-            return cls(**cls.__data_mapper__(data))
+            obj = cls(**cls.__data_mapper__(data))
+            if register:
+                cls.register(obj)
+            return obj
 
     @classmethod
     def subclass_from_dict(cls: typing.Type[T], data: typing.Dict) -> typing.Optional[T]:
         try:
             policy_type = {c.__name__: c for c in (cls, *cls.__subclasses__())}[data['type']]
-            return policy_type(**policy_type.__data_mapper__(data))
-        except (KeyError, TypeError):
+            return policy_type.from_dict(data)
+        except (KeyError, TypeError, ValueError):
             return
 
     @classmethod
-    def load(cls: typing.Type[T], file: pathlib.Path) -> typing.Optional[T]:
+    def load(cls: typing.Type[T], file: pathlib.Path, register: bool = True) -> typing.Optional[T]:
         try:
             with open(file) as in_file:
-                return cls.from_dict(dict(json.load(in_file), **{'namespace': file.parent.stem}))
+                return cls.from_dict(dict(json.load(in_file), **{'namespace': file.parent.stem}), register=register)
         except (IOError, json.JSONDecodeError, KeyError, UnicodeDecodeError, ValueError):
             return
 
     @classmethod
     @functools.lru_cache
     def get_cached_repo(cls: typing.Type[T]) -> typing.Dict[str, T]:
-        return {obj.id: obj for file in ls_repo() if (obj := cls.load(file=file)) is not None}
+        return {obj.id: obj for file in ls_repo() if (obj := cls.load(file=file, register=False)) is not None}
 
     @classmethod
     def get(cls: typing.Type[T], obj_id: str) -> typing.Optional[T]:
@@ -130,8 +139,8 @@ class Policy(BasePolicy):
         return dict(BasePolicy.__data_mapper__(data), **{'allowed': FrozenDict(data.get('allowed', {})),
                                                          'blocked': FrozenDict(data.get('blocked', {})),
                                                          'enforced': FrozenDict(data.get('enforced', {})),
-                                                         'required': tuple(data.get('required', tuple())),
-                                                         'possible': tuple(data.get('possible', tuple())), })
+                                                         'required': tuple(data.get('required', [])),
+                                                         'possible': tuple(data.get('possible', [])), })
 
     @functools.cached_property
     def params(self) -> typing.Tuple[str, ...]:
@@ -195,9 +204,9 @@ class Policy(BasePolicy):
             type=self.type,
             allowed={param: union(self.allowed.get(param), other.allowed.get(param))
                      for param in union(self.allowed.keys(), other.allowed.keys())},
-            blocked={param: tuple(value for value in values if value not in other.allowed.get(param, tuple()))
+            blocked={param: tuple(set(values) - set(other.allowed.get(param, [])))
                      for param, values in self.blocked.items()},
-            enforced={param: value for param, value in self.enforced.items() if value != other.allowed.get(param)},
+            enforced={param: value for param, value in self.enforced.items() if value not in other.allowed.get(param)},
             required=tuple(set(self.required) - set(other.allowed.keys())),
             possible=tuple() if not self.possible else union(self.possible, other.allowed.keys())))
 
@@ -240,8 +249,8 @@ class PolicySet(BasePolicy):
 
     @staticmethod
     def __data_mapper__(data: dict) -> dict:
-        return dict(BasePolicy.__data_mapper__(data), **{'policies': tuple(data.get('policies', tuple())),
-                                                         'exemptions': tuple(data.get('exemptions', tuple()))})
+        return dict(BasePolicy.__data_mapper__(data), **{'policies': tuple(data.get('policies', [])),
+                                                         'exemptions': tuple(data.get('exemptions', []))})
 
     @functools.cached_property
     def as_dict(self) -> typing.Dict:

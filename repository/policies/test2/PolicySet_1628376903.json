@@ -1,0 +1,45 @@
+{
+    "id": "test2:c6b98bce-deb3-5e32-8360-49bce84a3ab1",
+    "name": "<policy name here>",
+    "version": "<1628376903 replace with version>",
+    "doc": "https://documentation.link",
+    "target": "<target url or name here>",
+    "namespace": "test2",
+    "type": "PolicySet",
+    "policies": [
+        "test2:e5677a8d-e57f-5c84-9cb3-8e86abc514fc"
+    ],
+    "exemptions": [],
+    "policy": {
+        "<target url or name here>": {
+            "id": "test2:e5677a8d-e57f-5c84-9cb3-8e86abc514fc",
+            "name": "<policy name here>",
+            "version": "<1628371595 replace with version>",
+            "doc": "https://documentation.link",
+            "target": "<target url or name here>",
+            "namespace": "test2",
+            "type": "Policy",
+            "allowed": {
+                "param11": [
+                    "val11",
+                    "val12"
+                ]
+            },
+            "blocked": {
+                "param11": [
+                    "val00",
+                    "val99"
+                ]
+            },
+            "enforced": {},
+            "required": [],
+            "possible": [
+                "param11",
+                "param12",
+                "param13",
+                "param14"
+            ],
+            "ts": "1628377526"
+        }
+    }
+}

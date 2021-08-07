@@ -1,9 +1,0 @@
-{
-    "id": "test:1846bc55-7c7e-5b04-9210-e0f4e8501001",
-    "name": "test base policy 1",
-    "version": "2",
-    "doc": "test doc 1",
-    "target": "https://test.com",
-    "namespace": "test",
-    "type": "BasePolicy"
-}

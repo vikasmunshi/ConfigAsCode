@@ -1,9 +1,9 @@
 {
-    "id": "test2:238105f3-70de-5062-9c18-dfb7850405e6",
-    "name": "test policy 3",
-    "version": "1",
-    "doc": "test doc 1",
-    "target": "https://test2.com",
+    "id": "test2:8728d52c-9e93-5fec-acdd-7a1e273009fc",
+    "name": "<policy name here>",
+    "version": "<1628376899 replace with version>",
+    "doc": "https://documentation.link",
+    "target": "<target url or name here>",
     "namespace": "test2",
     "type": "Policy",
     "allowed": {
@@ -26,5 +26,6 @@
         "param11",
         "param12",
         "param13"
-    ]
+    ],
+    "ts": "1628377455"
 }

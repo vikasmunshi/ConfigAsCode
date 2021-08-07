@@ -17,19 +17,35 @@ def list_repo(policy_class: type) -> None:
 
 @enforce_strict_types
 def check_repo(policy_class: type) -> None:
+    cwd = pathlib.Path(os.getcwd())
     for file in ls_repo():
         try:
             with open(file) as in_file:
                 policy = policy_class.subclass_from_dict(dict(json.load(in_file), **{'namespace': file.parent.stem}))
-            if policy and policy.as_dict:
-                print(policy.as_dict)
-                print(f'OK {file} {policy.id}')
-        except (IOError, json.JSONDecodeError, KeyError, UnicodeDecodeError, ValueError):
-            print(f'NOK {file}')
+            if policy is None:
+                print(f'NOK {file.relative_to(cwd)} "corrupted or not a policy"')
+                continue
+            if policy.is_empty:
+                print(f'NOK {file.relative_to(cwd)} {policy.id} "is empty"')
+                continue
+            if not policy.as_dict:
+                print(f'NOK {file.relative_to(cwd)} {policy.id} "cannot be dumped"')
+                continue
+            if hasattr(policy, 'is_consistent') and not policy.is_consistent:
+                print(f'NOK {file.relative_to(cwd)} {policy.id} "is not consistent"')
+                continue
+            if hasattr(policy, 'policy') and not policy.policy:
+                print(f'NOK {file.relative_to(cwd)} {policy.id} "empty policy"')
+                continue
+        except (IOError, json.JSONDecodeError, UnicodeDecodeError):
+            print(f'NOK {file.relative_to(cwd)} "corrupted or not a policy"')
+        except (KeyError, ValueError) as e:
+            print(f'NOK {file.relative_to(cwd)} "policy has errors"\n\t{e}')
 
 
 @enforce_strict_types
 def fix_repo(policy_class: type) -> None:
+    cwd = pathlib.Path(os.getcwd())
     policy_repo = {c.__name__: [] for c in (BasePolicy, *BasePolicy.__subclasses__())}
     for file in ls_repo():
         try:
@@ -49,9 +65,9 @@ def fix_repo(policy_class: type) -> None:
             print(f'updated policy file "{file.stem}"', end=' ')
             if old_id:
                 updated[old_id] = policy.id
-                print(f'policy id "{old_id}" will be replaced by "{policy.id}"')
+                print(f'id "{old_id}" -> "{policy.id}"')
             else:
-                print(f'policy id "{old_id}" remains unchanged')
+                print(f'file "{file.relative_to(cwd)}" -> "{policy.id}"')
 
     for file, policy_data, policy in policy_repo['BasePolicy'] + policy_repo['Policy']:
         update(file, policy_data, policy)
@@ -61,14 +77,23 @@ def fix_repo(policy_class: type) -> None:
                 dict(policy_data, **{'policies': tuple(updated.get(p, p) for p in policy.policies),
                                      'exemptions': tuple(updated.get(p, p) for p in policy.exemptions)}))
         update(file, policy_data, policy)
+    for file, policy_data, policy in policy_repo['Config']:
+        if policy.applicable in updated:
+            policy = Config.from_dict(
+                dict(policy_data, **{'applicable': updated.get(policy.applicable, policy.applicable)}))
+        update(file, policy_data, policy)
 
 
 @enforce_types
 def create_new(policy_class: type) -> None:
     ts = str(int(time.time()))
     path = pathlib.Path(os.getcwd()).joinpath(f'{policy_class.__name__}_{ts}.json')
-    policy = policy_class.from_dict(dict(name='', version=ts, doc=f'https://documentation.link',
-                                         target='', namespace=path.parent.stem, type=policy_class.__name__))
+    policy = policy_class.from_dict(dict(name='policy name here',
+                                         version=f'{ts} replace with version',
+                                         doc=f'https://documentation.link',
+                                         target='target url or name here',
+                                         namespace=path.parent.stem,
+                                         type=policy_class.__name__))
     policy.dump(path)
     print(f'created new empty {policy_class.__name__} "{policy.id}" and saved as "{path.stem}"')
 

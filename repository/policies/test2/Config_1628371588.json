@@ -1,0 +1,45 @@
+{
+    "id": "test2:bd888ca9-41f7-5587-8151-1ccf09f1e7dc",
+    "name": "<policy name here>",
+    "version": "<1628371588 replace with version>",
+    "doc": "https://documentation.link",
+    "target": "<target url or name here>",
+    "namespace": "test2",
+    "type": "Config",
+    "assigned": {},
+    "applicable": "test2:b1be792e-7e22-5fbc-b12f-b5b589b8cc7e",
+    "policy": {
+        "<target url or name here>": {
+            "id": "test2:339b37d5-5f22-563d-8359-1b48e582f5b9",
+            "name": "<policy name here> v<1628371595 replace with version> (+) <policy name here> v<1628376899 replace with version> (-) <policy name here> v<1628377063 replace with version>",
+            "version": "",
+            "doc": "https://documentation.link (+) https://documentation.link (-) https://documentation.link",
+            "target": "<target url or name here>",
+            "namespace": "test2",
+            "type": "Policy",
+            "allowed": {
+                "param11": [
+                    "val12",
+                    "val11",
+                    "val00"
+                ]
+            },
+            "blocked": {
+                "param11": [
+                    "val99"
+                ]
+            },
+            "enforced": {
+                "param11": "val11"
+            },
+            "required": [],
+            "possible": [
+                "param12",
+                "param14",
+                "param13",
+                "param11"
+            ],
+            "ts": "1628377455"
+        }
+    }
+}
