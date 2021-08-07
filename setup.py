@@ -21,7 +21,7 @@ setup(
     install_requires=[],
     license='GNU GPL3',
     long_description=open('README.md').read(),
-    name='{}-{}'.format(package_name, package_version),
+    name=package_name,
     package_dir={package_name: 'CodifiedNorms'},
     packages=[package_name],
     platforms=['Linux', 'MacOS'],
