@@ -65,7 +65,7 @@ class BasePolicy:
     def id(self) -> str:
         content = dataclasses.asdict(self)
         content.pop('doc')
-        return f'Policy:{self.namespace}:{str(uuid.uuid5(uuid.NAMESPACE_URL, str(sorted(content.items()))))}'
+        return f'{self.namespace}:{str(uuid.uuid5(uuid.NAMESPACE_URL, str(sorted(content.items()))))}'
 
     @functools.cached_property
     def proper_name(self) -> str:
@@ -159,9 +159,9 @@ class Policy(BasePolicy):
             raise ValueError(f'inconsistent values for enforced Parameters: "{", ".join(ev)}"')
 
         return Policy.from_dict(dict(
-            name=f'{self.proper_name} ⊕ {other.proper_name}',
+            name=f'{self.proper_name} (+) {other.proper_name}',
             version='0',
-            doc=f'{self.doc} ⊕ {other.doc}',
+            doc=f'{self.doc} (+) {other.doc}',
             target=self.target,
             namespace=self.namespace,
             type=self.type,
@@ -183,9 +183,9 @@ class Policy(BasePolicy):
             raise ValueError(f'Exemption Policy should only have values in allowed and not in "{offending}"')
 
         return Policy.from_dict(dict(
-            name=f'{self.proper_name} ⊖ {other.proper_name}',
+            name=f'{self.proper_name} (-) {other.proper_name}',
             version='0',
-            doc=f'{self.doc} ⊖ {other.doc}',
+            doc=f'{self.doc} (-) {other.doc}',
             target=self.target,
             namespace=self.namespace,
             type=self.type,
