@@ -5,7 +5,7 @@
 from setuptools import setup
 
 package_name = 'codifiednorms'
-package_version = '0.1.20210807'
+package_version = '0.1'
 
 setup(
     author='Vikas Munshi',
@@ -22,7 +22,7 @@ setup(
     license='GNU GPL3',
     long_description=open('../README.md').read(),
     name='{}-{}'.format(package_name, package_version),
-    package_dir={package_name: '.'},
+    package_dir={package_name: 'CodifiedNorms'},
     packages=[package_name],
     platforms=['Linux', 'MacOS'],
     python_requires='>=3.7',
