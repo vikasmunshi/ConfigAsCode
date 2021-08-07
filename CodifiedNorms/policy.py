@@ -6,16 +6,17 @@ Class BasePolicy, Policy, PolicySet, Config
 from __future__ import annotations
 
 import dataclasses
-import functools
 import itertools
 import json
 import pathlib
-import typing
 import uuid
 
-from freezer import FrozenDict, enforce_strict_types, enforce_types
+try:
+    from .freezer import *
+except ImportError:
+    from freezer import *
 
-__all__ = ['BasePolicy', 'Policy', 'PolicySet', 'Config']
+__all__ = ['BasePolicy', 'Policy', 'PolicySet', 'Config', 'list_repo', 'fix_repo']
 
 T = typing.TypeVar('T', bound='BasePolicy')
 V = typing.Union[str, bool, None]
@@ -69,7 +70,7 @@ class BasePolicy:
 
     @functools.cached_property
     def proper_name(self) -> str:
-        return self.name if self.version == '0' else f'{self.name} v{self.version}'
+        return f'{self.name} v{self.version}' if self.version else self.name
 
     def dump(self, file: pathlib.Path) -> None:
         with open(file, 'w') as out_file:
@@ -160,7 +161,7 @@ class Policy(BasePolicy):
 
         return Policy.from_dict(dict(
             name=f'{self.proper_name} (+) {other.proper_name}',
-            version='0',
+            version='',
             doc=f'{self.doc} (+) {other.doc}',
             target=self.target,
             namespace=self.namespace,
@@ -184,7 +185,7 @@ class Policy(BasePolicy):
 
         return Policy.from_dict(dict(
             name=f'{self.proper_name} (-) {other.proper_name}',
-            version='0',
+            version='',
             doc=f'{self.doc} (-) {other.doc}',
             target=self.target,
             namespace=self.namespace,
@@ -310,7 +311,3 @@ def fix_repo(path: typing.Optional[pathlib.Path] = None) -> typing.Dict[str, str
                                      'exemptions': tuple(updated.get(p, p) for p in policy.exemptions)}))
         update(file, policy_data, policy)
     return updated
-
-
-if __name__ == '__main__':
-    print(len(fix_repo()))
