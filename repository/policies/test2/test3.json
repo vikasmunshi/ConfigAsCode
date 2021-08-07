@@ -1,15 +1,16 @@
 {
-    "id": "c78b75ef-6dc8-5092-bf42-e9493d26a74d",
+    "id": "Policy:test2:238105f3-70de-5062-9c18-dfb7850405e6",
     "name": "test policy 3",
     "version": "1",
     "doc": "test doc 1",
-    "target": "https://test.com",
+    "target": "https://test2.com",
     "namespace": "test2",
     "type": "Policy",
     "allowed": {
         "param11": [
             "val11",
-            "val12"
+            "val12",
+            "val16"
         ]
     },
     "blocked": {

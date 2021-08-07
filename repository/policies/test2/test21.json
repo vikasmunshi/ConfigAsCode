@@ -1,14 +1,18 @@
 {
-    "id": "85ad27f0-c006-574e-a919-d44fecb34e16",
-    "name": "test policy 2",
+    "id": "Policy:test2:1ec2a9c2-8db9-54bb-8631-36c72344ba2f",
+    "name": "test exemption policy 2",
     "version": "1",
     "doc": "test doc 1",
-    "target": "https://test.com",
+    "target": "https://test2.com",
     "namespace": "test2",
-    "type": "PolicyExemption",
-    "exempted": {
+    "type": "Policy",
+    "allowed": {
         "param11": [
             "val00"
         ]
-    }
+    },
+    "blocked": {},
+    "enforced": {},
+    "required": [],
+    "possible": []
 }

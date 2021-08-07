@@ -1,16 +1,75 @@
 {
-    "id": "3787f205-c35b-5f46-a5b6-229de8f17dc3",
+    "id": "Policy:test2:ebd38a12-cb0f-5c40-a1d6-09baafc4376f",
     "name": "test set 2",
     "version": "1",
     "doc": "test doc 1",
-    "target": "https://test.com",
+    "target": "https://test2.com",
     "namespace": "test2",
     "type": "PolicySet",
     "policies": [
-        "4fae067a-f2e4-513b-a34e-0a7fd4959b19",
-        "c78b75ef-6dc8-5092-bf42-e9493d26a74d"
+        "Policy:test2:bc9b9007-d193-5af2-a611-219542182c0b",
+        "Policy:test2:238105f3-70de-5062-9c18-dfb7850405e6",
+        "Policy:test:a185978c-b0b6-5a67-9bef-2608c2777777"
     ],
     "exemptions": [
-        "85ad27f0-c006-574e-a919-d44fecb34e16"
-    ]
+        "Policy:test2:1ec2a9c2-8db9-54bb-8631-36c72344ba2f"
+    ],
+    "policy": {
+        "https://test.com": {
+            "id": "Policy:test:a185978c-b0b6-5a67-9bef-2608c2777777",
+            "name": "test policy 1",
+            "version": "1",
+            "doc": "test doc 1",
+            "target": "https://test.com",
+            "namespace": "test",
+            "type": "Policy",
+            "allowed": {
+                "param11": [
+                    "val11",
+                    "val12"
+                ]
+            },
+            "blocked": {
+                "param11": [
+                    "val00"
+                ]
+            },
+            "enforced": {},
+            "required": [],
+            "possible": [
+                "param11",
+                "param12",
+                "param13"
+            ]
+        },
+        "https://test2.com": {
+            "id": "Policy:test2:8cb4f9bb-9715-5afe-8879-1818581dd5bd",
+            "name": "test policy 2 v1 \u2295 test policy 3 v1 \u2296 test exemption policy 2 v1",
+            "version": "0",
+            "doc": "test doc 1 \u2295 test doc 1 \u2296 test doc 1",
+            "target": "https://test2.com",
+            "namespace": "test2",
+            "type": "Policy",
+            "allowed": {
+                "param11": [
+                    "val11",
+                    "val12",
+                    "val00"
+                ]
+            },
+            "blocked": {
+                "param11": []
+            },
+            "enforced": {
+                "param11": "val11"
+            },
+            "required": [],
+            "possible": [
+                "param11",
+                "param12",
+                "param14",
+                "param13"
+            ]
+        }
+    }
 }

@@ -1,0 +1,9 @@
+{
+    "id": "Policy:test2:13e0737a-8684-564a-a860-95b616add035",
+    "name": "test base policy 3",
+    "version": "1",
+    "doc": "test doc 1",
+    "target": "https://test2.com",
+    "namespace": "test2",
+    "type": "BasePolicy"
+}

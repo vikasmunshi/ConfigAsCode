@@ -1,0 +1,9 @@
+{
+    "id": "Policy:auth:90ddf6a4-7aa3-5edd-8205-1f6b21795411",
+    "name": "test base policy 0",
+    "version": "2",
+    "doc": "test doc 1",
+    "target": "https://auth.com",
+    "namespace": "auth",
+    "type": "BasePolicy"
+}

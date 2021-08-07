@@ -1,9 +1,9 @@
 {
-    "id": "4fae067a-f2e4-513b-a34e-0a7fd4959b19",
+    "id": "Policy:test2:bc9b9007-d193-5af2-a611-219542182c0b",
     "name": "test policy 2",
     "version": "1",
     "doc": "test doc 1",
-    "target": "https://test.com",
+    "target": "https://test2.com",
     "namespace": "test2",
     "type": "Policy",
     "allowed": {
@@ -22,6 +22,7 @@
     "possible": [
         "param11",
         "param12",
-        "param13"
+        "param13",
+        "param14"
     ]
 }
