@@ -1,2 +1,2 @@
 [build-system]
-requires = ['build','setuptools']
+requires = ['setuptools', 'wheel']

@@ -6,6 +6,6 @@
 ### clone source and install from local drive
     git clone https://github.com/vikasmunshi/ConfigAsCode.git
     cd ConfigAsCode
-    python3 -m pip install -e codifiednorms
+    python3 -m pip install -e .
 ### pip install (<u>recommended</u>)
     python3 -m pip install -e git+https://github.com/vikasmunshi/ConfigAsCode.git#egg=codifiednorms
