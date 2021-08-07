@@ -8,22 +8,23 @@ from __future__ import annotations
 import dataclasses
 import itertools
 import json
+import os
 import pathlib
 import uuid
+import time
 
 try:
     from .freezer import *
 except ImportError:
     from freezer import *
 
-__all__ = ['BasePolicy', 'Policy', 'PolicySet', 'Config', 'list_repo', 'fix_repo']
-
 T = typing.TypeVar('T', bound='BasePolicy')
 V = typing.Union[str, bool, None]
 
 
 @enforce_types
-def ls_repo(path: pathlib.Path) -> typing.Generator[pathlib.Path, None, None]:
+def ls_repo(path: typing.Optional[pathlib.Path] = None) -> typing.Generator[pathlib.Path, None, None]:
+    path = path or pathlib.Path(os.getcwd())
     for file in path.iterdir():
         if file.is_dir():
             yield from ls_repo(file)
@@ -31,14 +32,16 @@ def ls_repo(path: pathlib.Path) -> typing.Generator[pathlib.Path, None, None]:
             yield file
 
 
-def intersection(l1: typing.Optional[typing.Iterable[str, ...]], l2: typing.Optional[typing.Iterable[str, ...]]) -> \
+@enforce_types
+def intersection(l1: typing.Optional[typing.Iterable[str]], l2: typing.Optional[typing.Iterable[str]]) -> \
         typing.Tuple[str, ...]:
     l1 = tuple(l1) if l1 is not None else tuple()
     l2 = tuple(l2) if l2 is not None else tuple()
     return tuple(set(l1 or l2).intersection(set(l2 or l1)))
 
 
-def union(l1: typing.Optional[typing.Iterable[str, ...]], l2: typing.Optional[typing.Iterable[str, ...]]) -> \
+@enforce_types
+def union(l1: typing.Optional[typing.Iterable[str]], l2: typing.Optional[typing.Iterable[str]]) -> \
         typing.Tuple[str, ...]:
     l1 = tuple(l1) if l1 is not None else tuple()
     l2 = tuple(l2) if l2 is not None else tuple()
@@ -59,8 +62,9 @@ class BasePolicy:
     def __data_mapper__(data: dict) -> dict:
         return {param: data[param] for param in (field.name for field in dataclasses.fields(BasePolicy))}
 
+    @functools.cached_property
     def as_dict(self) -> typing.Dict:
-        return {'id': self.id, **dataclasses.asdict(self)}
+        return {'id': self.id, **dataclasses.asdict(self), 'ts': str(int(time.time()))}
 
     @functools.cached_property
     def id(self) -> str:
@@ -74,7 +78,7 @@ class BasePolicy:
 
     def dump(self, file: pathlib.Path) -> None:
         with open(file, 'w') as out_file:
-            json.dump(self.as_dict(), out_file, indent=4)
+            json.dump(self.as_dict, out_file, indent=4)
 
     @classmethod
     def from_dict(cls: typing.Type[T], data: typing.Dict) -> typing.Optional[T]:
@@ -94,14 +98,13 @@ class BasePolicy:
         try:
             with open(file) as in_file:
                 return cls.from_dict(dict(json.load(in_file), **{'namespace': file.parent.stem}))
-        except (IOError, json.JSONDecodeError, KeyError, UnicodeDecodeError):
+        except (IOError, json.JSONDecodeError, KeyError, UnicodeDecodeError, ValueError):
             return
 
     @classmethod
     @functools.lru_cache
     def get_cached_repo(cls: typing.Type[T]) -> typing.Dict[str, T]:
-        return {obj.id: obj for file in ls_repo(pathlib.Path(__file__).parent.parent.joinpath('repository'))
-                if (obj := cls.load(file=file)) is not None}
+        return {obj.id: obj for file in ls_repo() if (obj := cls.load(file=file)) is not None}
 
     @classmethod
     def get(cls: typing.Type[T], obj_id: str) -> typing.Optional[T]:
@@ -240,74 +243,49 @@ class PolicySet(BasePolicy):
         return dict(BasePolicy.__data_mapper__(data), **{'policies': tuple(data.get('policies', tuple())),
                                                          'exemptions': tuple(data.get('exemptions', tuple()))})
 
+    @functools.cached_property
     def as_dict(self) -> typing.Dict:
-        return {'id': self.id, **dataclasses.asdict(self), 'policy': {t: p.as_dict() for t, p in self.policy.items()}}
+        return {'id': self.id, **dataclasses.asdict(self), 'policy': {t: p.as_dict for t, p in self.policy.items()}}
 
     @functools.cached_property
     def policy(self) -> FrozenDict[str, Policy]:
         def key(policy):
             return policy.target
 
-        policies = {k: list(v) for k, v in
-                    itertools.groupby(sorted([Policy.get(pid) for pid in self.policies], key=key), key=key)}
-        exemptions = {k: list(v) for k, v in
-                      itertools.groupby(sorted([Policy.get(pid) for pid in self.exemptions], key=key), key=key)}
+        try:
+            policies = {k: list(v) for k, v in
+                        itertools.groupby(sorted([Policy.get(pid) for pid in self.policies], key=key), key=key)}
+            exemptions = {k: list(v) for k, v in
+                          itertools.groupby(sorted([Policy.get(pid) for pid in self.exemptions], key=key), key=key)}
 
-        return FrozenDict({
-            target: functools.reduce(lambda x, y: x - y, exemptions.get(target, []),
-                                     functools.reduce(lambda x, y: x + y, policies[target]))
-            for target in policies.keys()})
+            return FrozenDict({
+                target: functools.reduce(lambda x, y: x - y, exemptions.get(target, []),
+                                         functools.reduce(lambda x, y: x + y, policies[target]))
+                for target in policies.keys()})
+        except AttributeError as e:
+            raise ValueError(f'PolicySet {self.id} refers to invalid policies')
 
 
 @enforce_strict_types
 @dataclasses.dataclass(frozen=True)
 class Config(BasePolicy):
     assigned: FrozenDict[str, FrozenDict[str, V]]
+    applicable: str
 
     @staticmethod
     def __data_mapper__(data: dict) -> dict:
-        return dict(BasePolicy.__data_mapper__(data), **{'assigned': FrozenDict(data.get('assigned', {}))})
+        return dict(BasePolicy.__data_mapper__(data), **{'assigned': FrozenDict(data.get('assigned', {})),
+                                                         'applicable': data.get('applicable', '')})
 
+    @functools.cached_property
+    def as_dict(self) -> typing.Dict:
+        return {'id': self.id, **dataclasses.asdict(self), 'policy': {t: p.as_dict for t, p in self.policy.items()}}
 
-@enforce_strict_types
-def list_repo(path: typing.Optional[pathlib.Path] = None) -> typing.Generator[BasePolicy, None, None]:
-    for file in ls_repo(path=path or pathlib.Path(getattr(__import__('os'), 'getcwd')())):
-        try:
-            with open(file) as in_file:
-                policy = BasePolicy.subclass_from_dict(dict(json.load(in_file), **{'namespace': file.parent.stem}))
-                if isinstance(policy, BasePolicy):
-                    yield policy
-        except (IOError, json.JSONDecodeError, KeyError, UnicodeDecodeError):
-            pass
-
-
-@enforce_strict_types
-def fix_repo(path: typing.Optional[pathlib.Path] = None) -> typing.Dict[str, str]:
-    policy_repo = {c.__name__: [] for c in (BasePolicy, *BasePolicy.__subclasses__())}
-    for file in ls_repo(path=path or pathlib.Path(getattr(__import__('os'), 'getcwd')())):
-        try:
-            with open(file) as in_file:
-                policy_data = json.load(in_file)
-                policy = BasePolicy.subclass_from_dict(dict(policy_data, **{'namespace': file.parent.stem}))
-            if isinstance(policy, BasePolicy):
-                policy_repo[policy.__class__.__name__] += [(file, policy_data, policy)]
-                policy.__class__.register(policy)
-        except (IOError, json.JSONDecodeError, KeyError, UnicodeDecodeError):
-            pass
-    updated = {}
-
-    def update(file: pathlib.Path, policy_data: dict, policy: BasePolicy) -> None:
-        if (old_id := policy_data.get('id')) != policy.id or policy_data.get('namespace') != policy.namespace:
-            policy.dump(file)
-            if old_id:
-                updated[old_id] = policy.id
-
-    for file, policy_data, policy in policy_repo['BasePolicy'] + policy_repo['Policy']:
-        update(file, policy_data, policy)
-    for file, policy_data, policy in policy_repo['PolicySet']:
-        if any((pid in policy.policies) or (pid in policy.exemptions) for pid in updated.keys()):
-            policy = PolicySet.from_dict(
-                dict(policy_data, **{'policies': tuple(updated.get(p, p) for p in policy.policies),
-                                     'exemptions': tuple(updated.get(p, p) for p in policy.exemptions)}))
-        update(file, policy_data, policy)
-    return updated
+    @functools.cached_property
+    def policy(self) -> FrozenDict[str, Policy]:
+        if self.applicable in Policy.get_cached_repo():
+            return PolicySet.from_dict(dict(self.as_dict, **{'policies': [self.applicable]})).policy
+        elif self.applicable in PolicySet.get_cached_repo():
+            return PolicySet.get(self.applicable).policy
+        else:
+            return FrozenDict({})

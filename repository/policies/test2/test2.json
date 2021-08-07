@@ -1,5 +1,5 @@
 {
-    "id": "test2:bc9b9007-d193-5af2-a611-219542182c0b",
+    "id": "test2:94881ab2-24a2-5393-9a1a-3d73d4724c41",
     "name": "test policy 2",
     "version": "1",
     "doc": "test doc 1",
@@ -14,7 +14,8 @@
     },
     "blocked": {
         "param11": [
-            "val00"
+            "val00",
+            "val99"
         ]
     },
     "enforced": {},
@@ -24,5 +25,6 @@
         "param12",
         "param13",
         "param14"
-    ]
+    ],
+    "ts": "1628366603"
 }
