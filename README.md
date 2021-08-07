@@ -11,7 +11,7 @@
     python3 -m pip install -e git+https://github.com/vikasmunshi/ConfigAsCode.git#egg=codifiednorms
 ## usage
     cd <repository directory>
-    python3 -m codifiednorms [-h] [action] [policy_type]
+    python3 [-I] -m codifiednorms [-h] [-v] [action] [policy_type]
 
     positional arguments:
       action       
@@ -28,3 +28,4 @@
     
     optional arguments:
       -h, --help   show this help message and exit
+      -v, --version  print version

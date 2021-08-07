@@ -1,11 +1,11 @@
 #!/usr/bin/env python3.9
 # -*- coding: utf-8 -*-
-import datetime
-
 try:
     from .policy import *
 except ImportError:
     from policy import *
+__package__ = 'codifiednorms'
+__version__ = '0.2.20210808'
 
 
 @enforce_strict_types
@@ -119,6 +119,10 @@ if __name__ == '__main__':
                         choices=list(policy_types.keys()),
                         help=f'\nchoices are {list(policy_types.keys())}\ndefault policy_type is all\n'
                              f'ignored for "action=fix"')
+    parser.add_argument('-v', '--version', action='store_true', help='print version')
 
     args = parser.parse_args()
-    funcs[args.action](policy_class=policy_types[args.policy_type])
+    if args.version:
+        print(f'{__package__}-{__version__}')
+    else:
+        funcs[args.action](policy_class=policy_types[args.policy_type])

@@ -5,4 +5,4 @@ try:
 except ImportError:
     from policy import *
 
-__all__ = ['Config', 'Policy', 'PolicySet', 'list_repo', 'fix_repo']
+__all__ = ['Config', 'Policy', 'PolicySet']
