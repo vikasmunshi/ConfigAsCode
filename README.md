@@ -1,9 +1,11 @@
 # ConfigAsCode
 
 ## install CodifiedNorms
-### source
+### update pip and setuptools packages
+    python3 -m pip install --upgrade pip setuptools
+### clone source and install from local drive
     git clone https://github.com/vikasmunshi/ConfigAsCode.git
-    cd ConfigAsCode/ConfigAsCode
+    cd ConfigAsCode
     python3 -m pip install -e codifiednorms
-### pip
-    python3 -m pip install -e git+https://github.com/vikasmunshi/ConfigAsCode.git#egg=codifiednorms-0.1
+### pip install (<u>recommended</u>)
+    python3 -m pip install -e git+https://github.com/vikasmunshi/ConfigAsCode.git#egg=codifiednorms
