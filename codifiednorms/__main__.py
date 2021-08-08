@@ -34,6 +34,7 @@ def check_repo(policy_class: type) -> None:
             if hasattr(policy, 'policy_violations') and (errors := policy.policy_violations) != '':
                 print(f'NOK {file.relative_to(repo_root)} {policy.id} "has policy violations {errors}"')
                 continue
+
             if hasattr(policy, 'policy'):
                 if not policy.policy:
                     print(f'NOK {file.relative_to(repo_root)} {policy.id} "empty policy"')

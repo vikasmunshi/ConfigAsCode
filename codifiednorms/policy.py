@@ -285,7 +285,7 @@ class Policy(BasePolicy):
 
     @property
     def policy(self) -> FrozenDict[str, Policy]:
-        return FrozenDict({self.target, self})
+        return FrozenDict({self.target: self})
 
 
 @enforce_strict_types
