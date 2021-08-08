@@ -202,7 +202,7 @@ class ConfigAsCodeTests(TestCase):
 
     def test_PolicyErrors(self):
         # noinspection PyTypeChecker
-        self.assertRaises(TypeError, lambda: p1 + ps1)
+        self.assertIsInstance(p1 + ps1, FrozenDict)
 
 
 if __name__ == '__main__':
