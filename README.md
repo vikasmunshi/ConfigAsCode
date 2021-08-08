@@ -20,7 +20,7 @@
 
 ### Post install
 
-    create a folder named "**repository**" anywhere on your local disk or clone/download a '*policy repository*'
+    create a folder named "repository" anywhere on your local disk or clone/download a '*policy repository*'
 
 ## Usage
 
