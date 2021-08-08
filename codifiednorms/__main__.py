@@ -1,11 +1,9 @@
 #!/usr/bin/env python3.9
 # -*- coding: utf-8 -*-
-try:
-    from .policy import *
-except ImportError:
-    from policy import *
-__package__ = 'codifiednorms'
-__version__ = '0.2.2021080810'
+"""
+Cmdline interface
+"""
+from .policy import *
 
 
 @enforce_strict_types
@@ -33,12 +31,17 @@ def check_repo(policy_class: type) -> None:
             if hasattr(policy, 'inconsistencies') and (errors := policy.inconsistencies) != '':
                 print(f'NOK {file.relative_to(repo_root)} {policy.id} "has consistency errors {errors}"')
                 continue
-            if hasattr(policy, 'policy') and not policy.policy:
-                print(f'NOK {file.relative_to(repo_root)} {policy.id} "empty policy"')
-                continue
             if hasattr(policy, 'policy_violations') and (errors := policy.policy_violations) != '':
                 print(f'NOK {file.relative_to(repo_root)} {policy.id} "has policy violations {errors}"')
                 continue
+            if hasattr(policy, 'policy'):
+                if not policy.policy:
+                    print(f'NOK {file.relative_to(repo_root)} {policy.id} "empty policy"')
+                    continue
+                if hasattr(policy.policy, 'inconsistencies') and (errors := policy.policy.inconsistencies) != '':
+                    print(f'NOK {file.relative_to(repo_root)} {policy.id}'
+                          f' "has consistency errors in derived policy {policy.policy.id} {errors}"')
+                    continue
         except (IOError, json.JSONDecodeError, UnicodeDecodeError):
             print(f'NOK {file.relative_to(repo_root)} "corrupted or not a policy"')
         except (KeyError, ValueError) as e:
@@ -130,6 +133,8 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.version:
+        from .__init__ import __package__, __version__
+
         print(f'{__package__}-{__version__}')
     else:
         funcs[args.action](policy_class=policy_types[args.policy_type])

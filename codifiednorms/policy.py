@@ -42,19 +42,13 @@ def ls_repo(path: typing.Optional[pathlib.Path] = None) -> typing.Generator[path
 
 
 @enforce_strict_types
-def intersection(l1: typing.Optional[typing.Iterable[str]], l2: typing.Optional[typing.Iterable[str]]) -> \
-        typing.Tuple[str, ...]:
-    l1 = tuple(l1) if l1 is not None else tuple()
-    l2 = tuple(l2) if l2 is not None else tuple()
+def intersection(l1: typing.Iterable[str], l2: typing.Iterable[str]) -> typing.Tuple[str, ...]:
     return tuple(set(l1 or l2).intersection(set(l2 or l1)))
 
 
 @enforce_strict_types
-def union(l1: typing.Optional[typing.Iterable[str]], l2: typing.Optional[typing.Iterable[str]]) -> \
-        typing.Tuple[str, ...]:
-    l1 = tuple(l1) if l1 is not None else tuple()
-    l2 = tuple(l2) if l2 is not None else tuple()
-    return tuple(set(l1 or l2).union(set(l2 or l1)))
+def union(l1: typing.Iterable[str], l2: typing.Iterable[str]) -> typing.Tuple[str, ...]:
+    return tuple(set(l1).union(set(l2)))
 
 
 @enforce_strict_types
@@ -177,6 +171,9 @@ class Policy(BasePolicy):
                 for value in values:
                     if param in self.blocked and value in self.blocked[param]:
                         errors += f'allowed value "{value}" for "{param}" is also blocked: {self.blocked}\n'
+        for param, values in self.allowed.items():
+            if not values:
+                errors += f'param {param} cannot be assigned any value\n'
         return errors.strip()
 
     def evaluate_policy(self, assigned: FrozenDict[str, str]) -> str:
@@ -206,7 +203,10 @@ class Policy(BasePolicy):
         if errors:
             return NotImplemented(errors)
 
-    def __add__(self: Policy, other: Policy) -> typing.Union[Policy, PolicySet]:
+    def __add__(self: Policy, other: typing.Union[Policy, PolicySet]) -> typing.Union[Policy, FrozenDict[str, Policy]]:
+        if isinstance(other, PolicySet):
+            return other + self
+
         self.policy_arithematic_checks(other)
 
         if self.target != other.target:
@@ -231,15 +231,26 @@ class Policy(BasePolicy):
             target=self.target,
             namespace=self.namespace,
             type='Policy',
-            allowed={param: intersection(self.allowed.get(param), other.allowed.get(param))
+            allowed={param: intersection(self.allowed.get(param, []), other.allowed.get(param, []))
                      for param in union(self.allowed.keys(), other.allowed.keys())},
-            blocked={param: union(self.blocked.get(param), other.blocked.get(param))
+            blocked={param: union(self.blocked.get(param, []), other.blocked.get(param, []))
                      for param in union(self.blocked.keys(), other.blocked.keys())},
             enforced=dict(other.enforced, **self.enforced),
-            required=tuple(set(self.required + other.required)),
-            possible=tuple() if not (self.possible and other.possible) else union(self.possible, other.possible)))
+            required=union(self.required, other.required),
+            possible=intersection(self.possible, other.possible)))
 
-    def __sub__(self: Policy, other: Policy) -> Policy:
+    def __sub__(self: Policy, other: typing.Union[Policy, PolicySet]) -> typing.Union[Policy, FrozenDict[str, Policy]]:
+        if isinstance(other, PolicySet):
+            return PolicySet.from_dict(dict(
+                name=f'{self.proper_name}',
+                version='',
+                doc=f'{self.doc}',
+                target=self.target,
+                namespace=self.namespace,
+                type='PolicySet',
+                policies=(self.id,),
+                exemptions=tuple(), )) - other
+
         self.policy_arithematic_checks(other)
 
         if not (other.allowed and all(not getattr(other, o) for o in ('blocked', 'enforced', 'required', 'possible'))):
@@ -264,7 +275,7 @@ class Policy(BasePolicy):
             target=self.target,
             namespace=self.namespace,
             type='Policy',
-            allowed={param: union(self.allowed.get(param), other.allowed.get(param))
+            allowed={param: union(self.allowed.get(param, []), other.allowed.get(param, []))
                      for param in union(self.allowed.keys(), other.allowed.keys())},
             blocked={param: tuple(set(values) - set(other.allowed.get(param, [])))
                      for param, values in self.blocked.items()},
@@ -298,10 +309,12 @@ class PolicySet(BasePolicy):
             return policy.target
 
         try:
-            policies = {k: list(v) for k, v in
-                        itertools.groupby(sorted([Policy.get(pid) for pid in self.policies], key=key), key=key)}
-            exemptions = {k: list(v) for k, v in
-                          itertools.groupby(sorted([Policy.get(pid) for pid in self.exemptions], key=key), key=key)}
+            policies = {
+                k: list(v)
+                for k, v in itertools.groupby(sorted([Policy.get(pid) for pid in self.policies], key=key), key=key)}
+            exemptions = {
+                k: list(v)
+                for k, v in itertools.groupby(sorted([Policy.get(pid) for pid in self.exemptions], key=key), key=key)}
 
             return FrozenDict({
                 target: functools.reduce(lambda x, y: x - y, exemptions.get(target, []),
@@ -320,49 +333,17 @@ class PolicySet(BasePolicy):
                                 for target, policy in self.policy.items() if policy.inconsistencies != '')
         return errors.strip()
 
-    def __add__(self: PolicySet, other: typing.Union[Policy, PolicySet]) -> PolicySet:
-        if isinstance(other, Policy):
-            return PolicySet.from_dict(dict(
-                name=f'{self.proper_name} (+) {other.proper_name}',
-                version='',
-                doc=f'{self.doc} (+) {other.doc}',
-                target=self.target,
-                namespace=self.namespace,
-                type='PolicySet',
-                policies=union(self.policies, (other.id,)),
-                exemptions=self.exemptions))
-        else:
-            return PolicySet.from_dict(dict(
-                name=f'{self.proper_name} (+) {other.proper_name}',
-                version='',
-                doc=f'{self.doc} (+) {other.doc}',
-                target=self.target,
-                namespace=self.namespace,
-                type='PolicySet',
-                policies=union(self.policies, other.policies),
-                exemptions=intersection(self.policies, other.policies), ))
+    def __add__(self: PolicySet, other: typing.Union[Policy, PolicySet]) -> FrozenDict[str, Policy]:
+        return FrozenDict({
+            target:
+                self.policy[target] + other.policy[target]
+                if (target in self.policy and target in other.policy)
+                else (self.policy.get(target) or other.policy[target])
+            for target in union(self.policy.keys(), other.policy.keys())})
 
     def __sub__(self: PolicySet, other: typing.Union[Policy, PolicySet]) -> PolicySet:
-        if isinstance(other, Policy):
-            return PolicySet.from_dict(dict(
-                name=f'{self.proper_name} (-) {other.proper_name}',
-                version='',
-                doc=f'{self.doc} (-) {other.doc}',
-                target=self.target,
-                namespace=self.namespace,
-                type='PolicySet',
-                policies=self.policies,
-                exemptions=union(self.exemptions, (other.id,))))
-        else:
-            return PolicySet.from_dict(dict(
-                name=f'{self.proper_name} (+) {other.proper_name}',
-                version='',
-                doc=f'{self.doc} (+) {other.doc}',
-                target=self.target,
-                namespace=self.namespace,
-                type='PolicySet',
-                policies=intersection(self.policies, other.policies),
-                exemptions=union(self.exemptions, other.exemptions), ))
+        return FrozenDict({target: policy - other.policy[target] if target in other.policy else policy
+                           for target, policy in self.policy.items()})
 
 
 @enforce_strict_types
@@ -409,3 +390,9 @@ class Config(BasePolicy):
             if target in self.policy:
                 errors += self.policy[target].evaluate_policy(assigned=assigned)
         return errors.strip()
+
+    @functools.cached_property
+    def config(self) -> typing.Optional[FrozenDict[str, FrozenDict[str, V]]]:
+        if self.inconsistencies == '' and self.policy_violations == '':
+            return FrozenDict({target: dict(assigned, **self.policy[target].enforced)
+                               for target, assigned in self.assigned.items()})
