@@ -1,0 +1,25 @@
+{
+    "id": "policies.test:294887a5-b602-502d-8cc8-43c7cf5722a9",
+    "name": "inconsistent policy",
+    "version": "1628415973 replace with version",
+    "doc": "https://documentation.link",
+    "target": "target url or name here",
+    "namespace": "policies.test",
+    "type": "Policy",
+    "allowed": {
+        "param11": [
+            "val00",
+            "val11",
+            "val12"
+        ]
+    },
+    "blocked": {
+        "param11": [
+            "val00"
+        ]
+    },
+    "enforced": {},
+    "required": [],
+    "possible": [],
+    "ts": "1628447057"
+}

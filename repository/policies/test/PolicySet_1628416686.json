@@ -1,0 +1,13 @@
+{
+    "id": "policies.test:3fdde262-87cd-5a38-9a14-dcbc30f8af36",
+    "name": "replace with name value",
+    "version": "replace with version value",
+    "doc": "replace with doc value",
+    "target": "replace with target value",
+    "namespace": "policies.test",
+    "type": "PolicySet",
+    "policies": [],
+    "exemptions": [],
+    "policy": {},
+    "ts": "1628447057"
+}

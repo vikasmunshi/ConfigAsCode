@@ -1,0 +1,15 @@
+{
+    "id": "policies.test2:31109e07-6c7b-5f05-b41d-79ce007a8171",
+    "name": "replace with name value",
+    "version": "replace with version value",
+    "doc": "replace with doc value",
+    "target": "replace with target value",
+    "namespace": "policies.test2",
+    "type": "Policy",
+    "allowed": {},
+    "blocked": {},
+    "enforced": {},
+    "required": [],
+    "possible": [],
+    "ts": "1628447057"
+}

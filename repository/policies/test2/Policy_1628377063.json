@@ -1,10 +1,10 @@
 {
-    "id": "test2:b9cf09b1-5fef-5e05-b616-82ef185b3282",
+    "id": "policies.test2:cdb7f4c1-bad8-582b-a2aa-68b32e9e8560",
     "name": "<policy name here>",
     "version": "<1628377063 replace with version>",
     "doc": "https://documentation.link",
     "target": "<target url or name here>",
-    "namespace": "test2",
+    "namespace": "policies.test2",
     "type": "Policy",
     "allowed": {
         "param11": [
@@ -15,5 +15,5 @@
     "enforced": {},
     "required": [],
     "possible": [],
-    "ts": "1628377089"
+    "ts": "1628447057"
 }

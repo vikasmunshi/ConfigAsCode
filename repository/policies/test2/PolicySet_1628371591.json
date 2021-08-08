@@ -1,32 +1,32 @@
 {
-    "id": "test2:b1be792e-7e22-5fbc-b12f-b5b589b8cc7e",
+    "id": "policies.test2:95760baf-6ba9-5350-8464-0be07a2e0f95",
     "name": "<policy name here>",
     "version": "<1628371591 replace with version>",
     "doc": "https://documentation.link",
     "target": "<target url or name here>",
-    "namespace": "test2",
+    "namespace": "policies.test2",
     "type": "PolicySet",
     "policies": [
-        "test2:e5677a8d-e57f-5c84-9cb3-8e86abc514fc",
-        "test2:8728d52c-9e93-5fec-acdd-7a1e273009fc"
+        "policies.test2:e48001c4-28b1-538f-b73f-58e77dfeafe1",
+        "policies.test2:a7ff3ef9-1634-5ecf-bc91-66ea0d8b475e"
     ],
     "exemptions": [
-        "test2:b9cf09b1-5fef-5e05-b616-82ef185b3282"
+        "policies.test2:cdb7f4c1-bad8-582b-a2aa-68b32e9e8560"
     ],
     "policy": {
         "<target url or name here>": {
-            "id": "test2:339b37d5-5f22-563d-8359-1b48e582f5b9",
+            "id": "policies.test2:b2ef6e20-b97f-5a63-aade-d7b35710fc37",
             "name": "<policy name here> v<1628371595 replace with version> (+) <policy name here> v<1628376899 replace with version> (-) <policy name here> v<1628377063 replace with version>",
             "version": "",
             "doc": "https://documentation.link (+) https://documentation.link (-) https://documentation.link",
             "target": "<target url or name here>",
-            "namespace": "test2",
+            "namespace": "policies.test2",
             "type": "Policy",
             "allowed": {
                 "param11": [
+                    "val00",
                     "val12",
-                    "val11",
-                    "val00"
+                    "val11"
                 ]
             },
             "blocked": {
@@ -39,12 +39,12 @@
             },
             "required": [],
             "possible": [
+                "param11",
                 "param12",
                 "param14",
-                "param13",
-                "param11"
-            ],
-            "ts": "1628377455"
+                "param13"
+            ]
         }
-    }
+    },
+    "ts": "1628447057"
 }

@@ -21,10 +21,19 @@ except ImportError:
 T = typing.TypeVar('T', bound='BasePolicy')
 V = typing.Union[str, bool, None]
 
+repo_root = pathlib.Path(os.getcwd().split('repository')[0]).joinpath('repository')
+if (not repo_root.exists()) or (not repo_root.is_dir()):
+    raise RuntimeError(f'cwd {os.getcwd()} does not contain and is not in a folder named repository')
 
-@enforce_types
+
+@enforce_strict_types
+def ns(file: pathlib.Path) -> str:
+    return str(file.relative_to(repo_root).parent).replace('/', '.')
+
+
+@enforce_strict_types
 def ls_repo(path: typing.Optional[pathlib.Path] = None) -> typing.Generator[pathlib.Path, None, None]:
-    path = path or pathlib.Path(os.getcwd())
+    path = path or repo_root
     for file in path.iterdir():
         if file.is_dir():
             yield from ls_repo(file)
@@ -32,7 +41,7 @@ def ls_repo(path: typing.Optional[pathlib.Path] = None) -> typing.Generator[path
             yield file
 
 
-@enforce_types
+@enforce_strict_types
 def intersection(l1: typing.Optional[typing.Iterable[str]], l2: typing.Optional[typing.Iterable[str]]) -> \
         typing.Tuple[str, ...]:
     l1 = tuple(l1) if l1 is not None else tuple()
@@ -40,7 +49,7 @@ def intersection(l1: typing.Optional[typing.Iterable[str]], l2: typing.Optional[
     return tuple(set(l1 or l2).intersection(set(l2 or l1)))
 
 
-@enforce_types
+@enforce_strict_types
 def union(l1: typing.Optional[typing.Iterable[str]], l2: typing.Optional[typing.Iterable[str]]) -> \
         typing.Tuple[str, ...]:
     l1 = tuple(l1) if l1 is not None else tuple()
@@ -60,11 +69,12 @@ class BasePolicy:
 
     @staticmethod
     def __data_mapper__(data: dict) -> dict:
-        return {param: data[param] for param in (field.name for field in dataclasses.fields(BasePolicy))}
+        return {param: data.get(param, f'replace with {param} value')
+                for param in (field.name for field in dataclasses.fields(BasePolicy))}
 
     @functools.cached_property
     def as_dict(self) -> typing.Dict:
-        return {'id': self.id, **dataclasses.asdict(self), 'ts': str(int(time.time()))}
+        return {'id': self.id, **dataclasses.asdict(self)}
 
     @functools.cached_property
     def id(self) -> str:
@@ -83,8 +93,9 @@ class BasePolicy:
         return all(not getattr(self, field) for field in fields) if fields else False
 
     def dump(self, file: pathlib.Path) -> None:
+        data = dict(self.as_dict, **{'ts': str(int(time.time()))})
         with open(file, 'w') as out_file:
-            json.dump(self.as_dict, out_file, indent=4)
+            json.dump(data, out_file, indent=4)
 
     @classmethod
     def from_dict(cls: typing.Type[T], data: typing.Dict, register: bool = True) -> typing.Optional[T]:
@@ -106,7 +117,7 @@ class BasePolicy:
     def load(cls: typing.Type[T], file: pathlib.Path, register: bool = True) -> typing.Optional[T]:
         try:
             with open(file) as in_file:
-                return cls.from_dict(dict(json.load(in_file), **{'namespace': file.parent.stem}), register=register)
+                return cls.from_dict(dict(json.load(in_file), **{'namespace': ns(file)}), register=register)
         except (IOError, json.JSONDecodeError, KeyError, UnicodeDecodeError, ValueError):
             return
 
@@ -148,28 +159,70 @@ class Policy(BasePolicy):
                                               self.enforced.keys(), self.required)))
 
     @functools.cached_property
-    def is_consistent(self) -> bool:
-        if self.possible and any(param not in self.possible for param in self.params):
-            return False
-        if self.enforced and not self.validate(assigned=self.enforced):
-            return False
-        if self.blocked and any(any(value in self.allowed.get(param, tuple()) for value in values)
-                                for param, values in self.blocked.items()):
-            return False
-        return True
+    def inconsistencies(self) -> str:
+        errors = ''
+        if self.possible:
+            for param_list, params in (('allowed', self.allowed.keys()), ('blocked', self.blocked.keys()),
+                                       ('required', self.required), ('enforced', self.enforced)):
+                for param in params:
+                    if param not in self.possible:
+                        errors += f'param {param} defined in "{param_list}" is not in "possible": {self.possible}\n'
+        for param, value in self.enforced.items():
+            if param in self.blocked and value in self.blocked[param]:
+                errors += f'enforced value "{value}" for "{param}" is blocked: {self.blocked}\n'
+            if param in self.allowed and value not in self.allowed[param]:
+                errors += f'enforced value "{value}" for "{param}" is not allowed: {self.allowed}\n'
+        if self.blocked:
+            for param, values in self.allowed.items():
+                for value in values:
+                    if param in self.blocked and value in self.blocked[param]:
+                        errors += f'allowed value "{value}" for "{param}" is also blocked: {self.blocked}\n'
+        return errors.strip()
 
-    def __post_init__(self):
-        if not self.is_consistent:
-            c = '; '.join(f'{a}:{getattr(self, a)}' for a in ('allowed', 'blocked', 'enforced', 'required', 'possible'))
-            raise ValueError(f'Policy {self.id} ({self.name}) is inconsistent; {c}')
+    def evaluate_policy(self, assigned: FrozenDict[str, str]) -> str:
+        errors = self.inconsistencies
+        for param, value in assigned.items():
+            if value not in self.allowed.get(param, (value,)):
+                errors += f'"{param}"="{value}" not allowed, allowed values are: {self.allowed[param]}\n'
+            if value in self.blocked.get(param, tuple()):
+                errors += f'"{param}"="{value}" is blocked, blocked values are: {self.blocked[param]}\n'
+            if value != self.enforced.get(param, value):
+                errors += f'"{param}"="{value}" is enforced to be "{self.enforced[param]}"\n'
+            if param not in (self.possible or (param,)):
+                errors += f'param "{param}" is not possible, possible params are: {self.possible}\n'
+        for param in self.required:
+            if param not in assigned:
+                errors += f'param {param} is required to be assigned, required params are: {self.required}\n'
+        return errors.strip()
+
+    def policy_arithematic_checks(self: Policy, other: Policy) -> None:
+        if not (isinstance(self, Policy) and isinstance(other, Policy)):
+            return NotImplemented(f'Cannot add/subtract non-Policy types "{type(self)}" and "{type(other)}"')
+        errors = ''
+        if self.inconsistencies != '':
+            errors += f'resolve consistency errors in {self.id}\n{self.consistency_errors}'
+        if other.inconsistencies != '':
+            errors += f'resolve consistency errors in {self.id}\n{other.consistency_errors}'
+        if errors:
+            return NotImplemented(errors)
 
     def __add__(self: Policy, other: Policy) -> typing.Union[Policy, PolicySet]:
-        if not (isinstance(self, Policy) and isinstance(other, Policy)):
-            return NotImplemented(f'Cannot combine type "{type(self)}" with "{type(other)}"')
+        self.policy_arithematic_checks(other)
+
         if self.target != other.target:
-            return NotImplemented(f'Cannot combine target "{self.target}" with "{other.target}"')
-        if ev := [param for param, value in self.enforced.items() if value != other.enforced.get(param, value)]:
-            raise ValueError(f'inconsistent values for enforced Parameters: "{", ".join(ev)}"')
+            return PolicySet.from_dict(dict(
+                name=f'{self.proper_name} (+) {other.proper_name}',
+                version='',
+                doc=f'{self.doc} (+) {other.doc}',
+                target=self.target,
+                namespace=self.namespace,
+                type='PolicySet',
+                policies=(self.id, other.id),
+                exemptions=tuple(), ))
+
+        if ev := [f'param {p} enforced to be {v1} by {self.id} and {v2} by {other.id}'
+                  for p, v1 in self.enforced.items() if v1 != (v2 := other.enforced.get(p, v1))]:
+            return NotImplemented(f'inconsistent values for enforced parameters {ev}')
 
         return Policy.from_dict(dict(
             name=f'{self.proper_name} (+) {other.proper_name}',
@@ -177,7 +230,7 @@ class Policy(BasePolicy):
             doc=f'{self.doc} (+) {other.doc}',
             target=self.target,
             namespace=self.namespace,
-            type=self.type,
+            type='Policy',
             allowed={param: intersection(self.allowed.get(param), other.allowed.get(param))
                      for param in union(self.allowed.keys(), other.allowed.keys())},
             blocked={param: union(self.blocked.get(param), other.blocked.get(param))
@@ -187,13 +240,22 @@ class Policy(BasePolicy):
             possible=tuple() if not (self.possible and other.possible) else union(self.possible, other.possible)))
 
     def __sub__(self: Policy, other: Policy) -> Policy:
-        if not (isinstance(self, Policy) and isinstance(other, Policy)):
-            return NotImplemented(f'Cannot exempt type "{type(self)}" by "{type(other)}"')
-        if self.target != other.target:
-            return NotImplemented(f'Cannot exempt target "{self.target}" with "{other.target}"')
+        self.policy_arithematic_checks(other)
+
         if not (other.allowed and all(not getattr(other, o) for o in ('blocked', 'enforced', 'required', 'possible'))):
             offending = tuple(k for k in ('blocked', 'enforced', 'required', 'possible') if getattr(other, k))
             raise ValueError(f'Exemption Policy should only have values in allowed and not in "{offending}"')
+
+        if self.target != other.target:
+            return PolicySet.from_dict(dict(
+                name=f'{self.proper_name} (-) {other.proper_name}',
+                version='',
+                doc=f'{self.doc} (-) {other.doc}',
+                target=self.target,
+                namespace=self.namespace,
+                type='PolicySet',
+                policies=(self.id,),
+                exemptions=(other.id,), ))
 
         return Policy.from_dict(dict(
             name=f'{self.proper_name} (-) {other.proper_name}',
@@ -201,7 +263,7 @@ class Policy(BasePolicy):
             doc=f'{self.doc} (-) {other.doc}',
             target=self.target,
             namespace=self.namespace,
-            type=self.type,
+            type='Policy',
             allowed={param: union(self.allowed.get(param), other.allowed.get(param))
                      for param in union(self.allowed.keys(), other.allowed.keys())},
             blocked={param: tuple(set(values) - set(other.allowed.get(param, [])))
@@ -210,35 +272,9 @@ class Policy(BasePolicy):
             required=tuple(set(self.required) - set(other.allowed.keys())),
             possible=tuple() if not self.possible else union(self.possible, other.allowed.keys())))
 
-    def apply_policy(self: Policy, policy: Policy) -> Policy:
-        try:
-            return self + policy
-        except (TypeError, ValueError):
-            return self
-
-    def apply_exemption(self: Policy, exemption: Policy) -> Policy:
-        try:
-            return self - exemption
-        except (TypeError, ValueError):
-            return self
-
-    def validate(self, assigned: FrozenDict[str, str]) -> bool:
-        return not any((value not in self.allowed.get(param, (value,)) or value in self.blocked.get(param, tuple())
-                        or value != self.enforced.get(param, value) or param not in (self.possible or (param,)))
-                       for param, value in assigned.items())
-
-    def violations(self, assigned: FrozenDict[str, str]) -> typing.Tuple[str]:
-        v = tuple()
-        for param, value in assigned.items():
-            if value not in self.allowed.get(param, (value,)):
-                v += f'"{param}"="{value}" not allowed, allowed values are: {self.allowed[param]}',
-            if value in self.blocked.get(param, tuple()):
-                v += f'"{param}"="{value}" is blocked, blocked values are: {self.blocked[param]}',
-            if value != self.enforced.get(param, value):
-                v += f'"{param}"="{value}" is enforced to be "{self.enforced[param]}"',
-            if param not in (self.possible or (param,)):
-                v += f'param "{param}" is not possible, possible params are: {self.possible}',
-        return v
+    @property
+    def policy(self) -> FrozenDict[str, Policy]:
+        return FrozenDict({self.target, self})
 
 
 @enforce_strict_types
@@ -272,7 +308,61 @@ class PolicySet(BasePolicy):
                                          functools.reduce(lambda x, y: x + y, policies[target]))
                 for target in policies.keys()})
         except AttributeError as e:
-            raise ValueError(f'PolicySet {self.id} refers to invalid policies')
+            return FrozenDict({})
+
+    @functools.cached_property
+    def inconsistencies(self) -> str:
+        errors = ''
+        if not self.policy:
+            errors += f'PolicySet {self.id} has an invalid policy'
+        else:
+            errors += '\n'.join(f'policy for {target} has errors:\n{policy.inconsistencies}\n'
+                                for target, policy in self.policy.items() if policy.inconsistencies != '')
+        return errors.strip()
+
+    def __add__(self: PolicySet, other: typing.Union[Policy, PolicySet]) -> PolicySet:
+        if isinstance(other, Policy):
+            return PolicySet.from_dict(dict(
+                name=f'{self.proper_name} (+) {other.proper_name}',
+                version='',
+                doc=f'{self.doc} (+) {other.doc}',
+                target=self.target,
+                namespace=self.namespace,
+                type='PolicySet',
+                policies=union(self.policies, (other.id,)),
+                exemptions=self.exemptions))
+        else:
+            return PolicySet.from_dict(dict(
+                name=f'{self.proper_name} (+) {other.proper_name}',
+                version='',
+                doc=f'{self.doc} (+) {other.doc}',
+                target=self.target,
+                namespace=self.namespace,
+                type='PolicySet',
+                policies=union(self.policies, other.policies),
+                exemptions=intersection(self.policies, other.policies), ))
+
+    def __sub__(self: PolicySet, other: typing.Union[Policy, PolicySet]) -> PolicySet:
+        if isinstance(other, Policy):
+            return PolicySet.from_dict(dict(
+                name=f'{self.proper_name} (-) {other.proper_name}',
+                version='',
+                doc=f'{self.doc} (-) {other.doc}',
+                target=self.target,
+                namespace=self.namespace,
+                type='PolicySet',
+                policies=self.policies,
+                exemptions=union(self.exemptions, (other.id,))))
+        else:
+            return PolicySet.from_dict(dict(
+                name=f'{self.proper_name} (+) {other.proper_name}',
+                version='',
+                doc=f'{self.doc} (+) {other.doc}',
+                target=self.target,
+                namespace=self.namespace,
+                type='PolicySet',
+                policies=intersection(self.policies, other.policies),
+                exemptions=union(self.exemptions, other.exemptions), ))
 
 
 @enforce_strict_types
@@ -298,3 +388,24 @@ class Config(BasePolicy):
             return PolicySet.get(self.applicable).policy
         else:
             return FrozenDict({})
+
+    @functools.cached_property
+    def inconsistencies(self) -> str:
+        errors = ''
+        if not self.policy:
+            errors += f'PolicySet {self.id} has an invalid policy'
+        else:
+            errors += '\n'.join(f'policy for {target} has errors:\n{policy.inconsistencies}\n'
+                                for target, policy in self.policy.items() if policy.inconsistencies != '')
+            for target in self.assigned.keys():
+                if target not in self.policy:
+                    errors += f'no policy defined in applicable for target {target}'
+        return errors.strip()
+
+    @functools.cached_property
+    def policy_violations(self) -> str:
+        errors = self.inconsistencies
+        for target, assigned in self.assigned.items():
+            if target in self.policy:
+                errors += self.policy[target].evaluate_policy(assigned=assigned)
+        return errors.strip()
