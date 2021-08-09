@@ -104,31 +104,30 @@ def create_new(policy_class: type) -> None:
 
 if __name__ == '__main__':
     import argparse
+    from .__init__ import __doc__, __package__, __version__
 
     funcs = {'list': list_repo, 'check': check_repo, 'fix': fix_repo, 'new': create_new}
-    policy_types = dict({'all': BasePolicy}, **{c.__name__: c for c in BasePolicy.__subclasses__()})
+    policy_types = {c.__name__: c for c in BasePolicy.__subclasses__()}
 
-    parser = argparse.ArgumentParser(description='Manage "Codified Norms" and "Config as Code"',
+    parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawTextHelpFormatter,
                                      prog='python3 -m codifiednorms')
     parser.add_argument('action', default='list', metavar='action', nargs='?',
                         choices=list(funcs.keys()),
                         help=f'\nchoices are {list(funcs.keys())}\n'
-                             'list: list policies in current repository\n'
+                             'list: list policies in current repository (default)\n'
                              'check: check policies in current repository\n'
                              'fix: fix policies in current repository\n'
-                             'new: create new policy\n'
-                             'default action is list', )
-    parser.add_argument('policy_type', type=str, default='all', metavar='policy_type', nargs='?',
+                             'new: create new policy\n', )
+    parser.add_argument('policy_type', type=str, default=None, metavar='policy_type', nargs='?',
                         choices=list(policy_types.keys()),
-                        help=f'\nchoices are {list(policy_types.keys())}\ndefault policy_type is all\n'
-                             f'ignored for "action=fix"')
-    parser.add_argument('-v', '--version', action='store_true', help='print version')
+                        help=f'\nchoices are {list(policy_types.keys())}\nignored for "action=fix"')
+    parser.add_argument('-v', '--version', action='store_true', help='show version')
 
     args = parser.parse_args()
     if args.version:
-        from .__init__ import __package__, __version__
-
         print(f'{__package__}-{__version__}: {pathlib.Path(__file__).parent}')
     else:
-        funcs[args.action](policy_class=policy_types[args.policy_type])
+        if (not repo_root.exists()) or (not repo_root.is_dir()):
+            raise RuntimeError(f'cwd {os.getcwd()} does not contain and is not in a folder named repository')
+        funcs[args.action](policy_class=policy_types[args.policy_type] if args.policy_type else BasePolicy)

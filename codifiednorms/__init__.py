@@ -1,10 +1,8 @@
 #!/usr/bin/env python3.9
 # -*- coding: utf-8 -*-
-"""
-Manage "Codified Norms" and "Config as Code"
-"""
+__doc__ = "Python3 library to Manage Codified Norms and Config as Code"
 __package__ = 'codifiednorms'
-__version__ = '0.2.2021080915'
+__version__ = '0.2.20210811'
 
 from .policy import *
 

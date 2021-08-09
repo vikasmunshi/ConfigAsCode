@@ -31,8 +31,6 @@ def location(file: pathlib.Path) -> str:
 
 @enforce_strict_types
 def ls_repo(path: typing.Optional[pathlib.Path] = None) -> typing.Generator[pathlib.Path, None, None]:
-    if (not repo_root.exists()) or (not repo_root.is_dir()):
-        raise RuntimeError(f'cwd {os.getcwd()} does not contain and is not in a folder named repository')
     path = path or repo_root
     for file in path.iterdir():
         if file.is_dir():

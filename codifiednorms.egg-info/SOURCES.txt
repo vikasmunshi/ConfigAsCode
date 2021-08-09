@@ -11,3 +11,4 @@ codifiednorms.egg-info/PKG-INFO
 codifiednorms.egg-info/SOURCES.txt
 codifiednorms.egg-info/dependency_links.txt
 codifiednorms.egg-info/top_level.txt
+codifiednorms.egg-info/zip-safe
