@@ -4,7 +4,7 @@
 Manage "Codified Norms" and "Config as Code"
 """
 __package__ = 'codifiednorms'
-__version__ = '0.2.2021080913'
+__version__ = '0.2.2021080915'
 
 from .policy import *
 
