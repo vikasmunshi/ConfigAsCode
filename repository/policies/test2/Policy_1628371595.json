@@ -1,10 +1,10 @@
 {
-    "id": "policies.test2:e48001c4-28b1-538f-b73f-58e77dfeafe1",
+    "id": "policies.test2.Policy_1628371595:5ecddd3c-32da-5b07-8852-b92dcb631ef9",
+    "location": "policies.test2.Policy_1628371595",
     "name": "<policy name here>",
     "version": "<1628371595 replace with version>",
     "doc": "https://documentation.link",
     "target": "<target url or name here>",
-    "namespace": "policies.test2",
     "type": "Policy",
     "allowed": {
         "param11": [
@@ -26,5 +26,5 @@
         "param13",
         "param14"
     ],
-    "ts": "1628447057"
+    "ts": "1628516853"
 }

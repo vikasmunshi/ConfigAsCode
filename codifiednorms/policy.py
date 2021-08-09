@@ -19,14 +19,14 @@ except ImportError:
     from freezer import *
 
 T = typing.TypeVar('T', bound='BasePolicy')
-V = typing.Union[str, bool, None]
+Val = typing.Union[str, bool, None]
 
 repo_root = pathlib.Path(os.getcwd().split('repository')[0]).joinpath('repository')
 
 
 @enforce_strict_types
-def ns(file: pathlib.Path) -> str:
-    return str(file.relative_to(repo_root).parent).replace('/', '.')
+def location(file: pathlib.Path) -> str:
+    return f'{file.relative_to(repo_root).parent}.{file.stem}'.replace('/', '.')
 
 
 @enforce_strict_types
@@ -54,11 +54,11 @@ def union(l1: typing.Iterable[str], l2: typing.Iterable[str]) -> typing.Tuple[st
 @enforce_strict_types
 @dataclasses.dataclass(frozen=True)
 class BasePolicy:
+    location: str
     name: str
     version: str
     doc: str
     target: str
-    namespace: str
     type: str
 
     @staticmethod
@@ -74,7 +74,7 @@ class BasePolicy:
     def id(self) -> str:
         content = dataclasses.asdict(self)
         content.pop('doc')
-        return f'{self.namespace}:{str(uuid.uuid5(uuid.NAMESPACE_URL, str(sorted(content.items()))))}'
+        return f'{self.location}:{str(uuid.uuid5(uuid.NAMESPACE_URL, str(sorted(content.items()))))}'
 
     @functools.cached_property
     def proper_name(self) -> str:
@@ -111,7 +111,7 @@ class BasePolicy:
     def load(cls: typing.Type[T], file: pathlib.Path, register: bool = True) -> typing.Optional[T]:
         try:
             with open(file) as in_file:
-                return cls.from_dict(dict(json.load(in_file), **{'namespace': ns(file)}), register=register)
+                return cls.from_dict(dict(json.load(in_file), **{'location': location(file)}), register=register)
         except (IOError, json.JSONDecodeError, KeyError, UnicodeDecodeError, ValueError):
             return
 
@@ -121,7 +121,12 @@ class BasePolicy:
         return {obj.id: obj for file in ls_repo() if (obj := cls.load(file=file, register=False)) is not None}
 
     @classmethod
-    def get(cls: typing.Type[T], obj_id: str) -> typing.Optional[T]:
+    def get(cls: typing.Type[T], obj_id: str, approx_match: bool = False) -> typing.Optional[T]:
+        if approx_match and obj_id not in cls.get_cached_repo():
+            if len(matching := [obj.id
+                                for obj in cls.get_cached_repo().values()
+                                if obj.id.startswith(obj_id.split(':')[0])]) == 1:
+                obj_id = matching[0]
         return cls.get_cached_repo().get(obj_id)
 
     @classmethod
@@ -133,9 +138,9 @@ class BasePolicy:
 @enforce_strict_types
 @dataclasses.dataclass(frozen=True)
 class Policy(BasePolicy):
-    allowed: FrozenDict[str, typing.Tuple[V, ...]]
-    blocked: FrozenDict[str, typing.Tuple[V, ...]]
-    enforced: FrozenDict[str, V]
+    allowed: FrozenDict[str, typing.Tuple[Val, ...]]
+    blocked: FrozenDict[str, typing.Tuple[Val, ...]]
+    enforced: FrozenDict[str, Val]
     required: typing.Tuple[str, ...]
     possible: typing.Tuple[str, ...]
 
@@ -215,7 +220,7 @@ class Policy(BasePolicy):
                 version='',
                 doc=f'{self.doc} (+) {other.doc}',
                 target=self.target,
-                namespace=self.namespace,
+                location=self.location,
                 type='PolicySet',
                 policies=(self.id, other.id),
                 exemptions=tuple(), ))
@@ -229,7 +234,7 @@ class Policy(BasePolicy):
             version='',
             doc=f'{self.doc} (+) {other.doc}',
             target=self.target,
-            namespace=self.namespace,
+            location=self.location,
             type='Policy',
             allowed={param: intersection(self.allowed.get(param, []), other.allowed.get(param, []))
                      for param in union(self.allowed.keys(), other.allowed.keys())},
@@ -246,7 +251,7 @@ class Policy(BasePolicy):
                 version='',
                 doc=f'{self.doc}',
                 target=self.target,
-                namespace=self.namespace,
+                location=self.location,
                 type='PolicySet',
                 policies=(self.id,),
                 exemptions=tuple(), )) - other
@@ -263,7 +268,7 @@ class Policy(BasePolicy):
                 version='',
                 doc=f'{self.doc} (-) {other.doc}',
                 target=self.target,
-                namespace=self.namespace,
+                location=self.location,
                 type='PolicySet',
                 policies=(self.id,),
                 exemptions=(other.id,), ))
@@ -273,7 +278,7 @@ class Policy(BasePolicy):
             version='',
             doc=f'{self.doc} (-) {other.doc}',
             target=self.target,
-            namespace=self.namespace,
+            location=self.location,
             type='Policy',
             allowed={param: union(self.allowed.get(param, []), other.allowed.get(param, []))
                      for param in union(self.allowed.keys(), other.allowed.keys())},
@@ -349,7 +354,7 @@ class PolicySet(BasePolicy):
 @enforce_strict_types
 @dataclasses.dataclass(frozen=True)
 class Config(BasePolicy):
-    assigned: FrozenDict[str, FrozenDict[str, V]]
+    assigned: FrozenDict[str, FrozenDict[str, Val]]
     applicable: str
 
     @staticmethod
@@ -392,7 +397,7 @@ class Config(BasePolicy):
         return errors.strip()
 
     @functools.cached_property
-    def config(self) -> typing.Optional[FrozenDict[str, FrozenDict[str, V]]]:
+    def config(self) -> typing.Optional[FrozenDict[str, FrozenDict[str, Val]]]:
         if self.inconsistencies == '' and self.policy_violations == '':
             return FrozenDict({target: dict(assigned, **self.policy[target].enforced)
                                for target, assigned in self.assigned.items()})

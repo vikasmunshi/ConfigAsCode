@@ -8,31 +8,31 @@ from freezer import FrozenDict
 from policy import BasePolicy, Policy, PolicySet, ls_repo
 
 b1 = BasePolicy.from_dict(dict(name='test base policy 0', version='1', doc='test doc 1',
-                               target='https=//test.com', namespace='test', type='BasePolicy'))
+                               target='https=//test.com', location='test', type='BasePolicy'))
 BasePolicy.register(b1)
-p1 = Policy.from_dict(dict(name='test p1', version='1', doc='doc', target='test', namespace='test', type='Policy',
+p1 = Policy.from_dict(dict(name='test p1', version='1', doc='doc', target='test', location='test', type='Policy',
                            allowed={'param1': ['val1', 'val2']},
                            blocked={'param1': ['val0']},
                            enforced={}, required=tuple(), possible=tuple()))
 Policy.register(p1)
-p2 = Policy.from_dict(dict(name='test p2', version='1', doc='doc', target='test', namespace='test', type='Policy',
+p2 = Policy.from_dict(dict(name='test p2', version='1', doc='doc', target='test', location='test', type='Policy',
                            allowed={'param0': ['val0'], 'param1': ['val2']},
                            blocked={'param1': ['val0', 'val1']},
                            enforced={}, required=tuple(), possible=tuple()))
 Policy.register(p2)
-p3 = Policy.from_dict(dict(name='test p3', version='1', doc='doc', target='other_test', namespace='test',
+p3 = Policy.from_dict(dict(name='test p3', version='1', doc='doc', target='other_test', location='test',
                            type='Policy',
                            allowed={'param0': ['val0'], 'param1': ['val2']},
                            blocked={'param1': ['val0', 'val1']},
                            enforced={}, required=tuple(), possible=tuple()))
 Policy.register(p3)
-e1 = Policy.from_dict(dict(name='test e1', version='1', doc='doc', target='test', namespace='test',
+e1 = Policy.from_dict(dict(name='test e1', version='1', doc='doc', target='test', location='test',
                            type='Policy', allowed={'param1': ['val0']}))
 Policy.register(e1)
-ps1 = PolicySet.from_dict(dict(name='test ps1', version='1', doc='doc', target='test', namespace='test',
+ps1 = PolicySet.from_dict(dict(name='test ps1', version='1', doc='doc', target='test', location='test',
                                type='PolicySet', policies=(p1.id, p2.id), exemptions=(e1.id,)))
 PolicySet.register(ps1)
-ps2 = PolicySet.from_dict(dict(name='test ps2', version='1', doc='doc', target='test', namespace='test',
+ps2 = PolicySet.from_dict(dict(name='test ps2', version='1', doc='doc', target='test', location='test',
                                type='PolicySet', policies=(p1.id, p2.id), exemptions=tuple()))
 PolicySet.register(ps2)
 
@@ -56,7 +56,7 @@ class ConfigAsCodeTests(TestCase):
             self.assertEqual(policy, BasePolicy.get(pid))
 
     def test_BasePolicyImmutability(self):
-        policy = BasePolicy(name='test', version='1', doc='documentation', target='test', namespace='test',
+        policy = BasePolicy(name='test', version='1', doc='documentation', target='test', location='test',
                             type='BasePolicy')
 
         def change_name():
@@ -75,15 +75,15 @@ class ConfigAsCodeTests(TestCase):
             # noinspection PyDataclass
             policy.target = 'new'
 
-        def change_namespace():
+        def change_location():
             # noinspection PyDataclass
-            policy.namespace = 'new'
+            policy.location = 'new'
 
         def change_type():
             # noinspection PyDataclass
             policy.type = 'new'
 
-        for func in (change_name, change_version, change_doc, change_target, change_namespace, change_type):
+        for func in (change_name, change_version, change_doc, change_target, change_location, change_type):
             self.assertRaises(FrozenInstanceError, func)
 
     def test_Policy(self):
@@ -120,7 +120,7 @@ class ConfigAsCodeTests(TestCase):
     def test_PolicyImmutability(self):
         def assign_dict():
             # noinspection PyTypeChecker
-            Policy(name='test assign_dict', version='1', doc='doc', target='test', namespace='test', type='Policy',
+            Policy(name='test assign_dict', version='1', doc='doc', target='test', location='test', type='Policy',
                    allowed={'param1': ['val1']},
                    blocked={'param1': ['val0']},
                    enforced={},
@@ -128,7 +128,7 @@ class ConfigAsCodeTests(TestCase):
 
         def assign_list():
             # noinspection PyTypeChecker
-            Policy(name='test assign_list', version='1', doc='doc', target='test', namespace='test', type='Policy',
+            Policy(name='test assign_list', version='1', doc='doc', target='test', location='test', type='Policy',
                    allowed=FrozenDict({'param1': ['val1']}),
                    blocked=FrozenDict({'param1': ['val0']}),
                    enforced=FrozenDict({}),
@@ -136,13 +136,13 @@ class ConfigAsCodeTests(TestCase):
 
         def assign_str():
             # noinspection PyTypeChecker
-            Policy(name='test', version='1', doc='doc', target='test', namespace='test', type='Policy',
+            Policy(name='test', version='1', doc='doc', target='test', location='test', type='Policy',
                    allowed=FrozenDict({'param1': 'val1'}),
                    blocked=FrozenDict({'param1': 'val0'}),
                    enforced=FrozenDict({}),
                    required=[], possible=[])
 
-        policy = Policy(name='test assign_str', version='1', doc='doc', target='test', namespace='test', type='Policy',
+        policy = Policy(name='test assign_str', version='1', doc='doc', target='test', location='test', type='Policy',
                         allowed=FrozenDict({'param1': ['val1']}),
                         blocked=FrozenDict({'param1': ['val0']}),
                         enforced=FrozenDict({}),
@@ -167,31 +167,31 @@ class ConfigAsCodeTests(TestCase):
     def test_PolicyConsistency(self):
         def allowed_and_blocked():
             return Policy.from_dict(dict(name='test allowed_and_blocked', version='1', doc='doc', target='test',
-                                         namespace='test', type='Policy',
+                                         location='test', type='Policy',
                                          allowed={'param1': ['val0', 'val1']}, blocked={'param1': ['val0']},
                                          enforced={}, required=tuple(), possible=tuple()))
 
         def enforced_and_blocked():
             return Policy.from_dict(dict(name='test enforced_and_blocked', version='1', doc='doc', target='test',
-                                         namespace='test', type='Policy',
+                                         location='test', type='Policy',
                                          allowed={'param1': ['val1']}, blocked={'param1': ['val0']},
                                          enforced={'param1': 'val0'}, required=tuple(), possible=tuple()))
 
         def allowed_not_in_possible():
             return Policy.from_dict(dict(name='test allowed_not_in_possible', version='1', doc='doc', target='test',
-                                         namespace='test', type='Policy',
+                                         location='test', type='Policy',
                                          allowed={'param1': ['val1']}, blocked={'param2': ['val0']},
                                          enforced={'param1': 'val0'}, required=tuple(), possible=('param0', 'param2')))
 
         def blocked_not_in_possible():
             return Policy.from_dict(dict(name='test blocked_not_in_possible', version='1', doc='doc', target='test',
-                                         namespace='test', type='Policy',
+                                         location='test', type='Policy',
                                          allowed={'param1': ['val1']}, blocked={'param2': ['val0']},
                                          enforced={'param1': 'val0'}, required=tuple(), possible=('param0', 'param1')))
 
         def required_not_in_possible():
             return Policy.from_dict(dict(name='test required_not_in_possible', version='1', doc='doc', target='test',
-                                         namespace='test', type='Policy',
+                                         location='test', type='Policy',
                                          allowed={'param1': ['val1']}, blocked={'param1': ['val0']},
                                          enforced={'param1': 'val0'},
                                          required=('param0', 'param1'), possible=('param1', 'param2')))

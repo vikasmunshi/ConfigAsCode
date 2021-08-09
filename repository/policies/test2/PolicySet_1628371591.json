@@ -1,26 +1,26 @@
 {
-    "id": "policies.test2:95760baf-6ba9-5350-8464-0be07a2e0f95",
+    "id": "policies.test2.PolicySet_1628371591:d0bda57c-87d5-52e6-be03-c470361d55ff",
+    "location": "policies.test2.PolicySet_1628371591",
     "name": "<policy name here>",
     "version": "<1628371591 replace with version>",
     "doc": "https://documentation.link",
     "target": "<target url or name here>",
-    "namespace": "policies.test2",
     "type": "PolicySet",
     "policies": [
-        "policies.test2:e48001c4-28b1-538f-b73f-58e77dfeafe1",
-        "policies.test2:a7ff3ef9-1634-5ecf-bc91-66ea0d8b475e"
+        "policies.test2.Policy_1628371595:5ecddd3c-32da-5b07-8852-b92dcb631ef9",
+        "policies.test2.Policy_1628376899:96088ad4-fa5c-5bee-9abf-1224635a1145"
     ],
     "exemptions": [
-        "policies.test2:cdb7f4c1-bad8-582b-a2aa-68b32e9e8560"
+        "policies.test2.Policy_1628377063:c2c040ae-877f-5e12-895f-b050c4068a84"
     ],
     "policy": {
         "<target url or name here>": {
-            "id": "policies.test2:b2ef6e20-b97f-5a63-aade-d7b35710fc37",
+            "id": "policies.test2.Policy_1628371595:31181886-d0c3-5560-b8e0-7afda1eb8cbb",
+            "location": "policies.test2.Policy_1628371595",
             "name": "<policy name here> v<1628371595 replace with version> (+) <policy name here> v<1628376899 replace with version> (-) <policy name here> v<1628377063 replace with version>",
             "version": "",
             "doc": "https://documentation.link (+) https://documentation.link (-) https://documentation.link",
             "target": "<target url or name here>",
-            "namespace": "policies.test2",
             "type": "Policy",
             "allowed": {
                 "param11": [
@@ -39,12 +39,11 @@
             },
             "required": [],
             "possible": [
-                "param11",
                 "param12",
-                "param14",
+                "param11",
                 "param13"
             ]
         }
     },
-    "ts": "1628447057"
+    "ts": "1628516855"
 }

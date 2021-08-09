@@ -1,15 +1,15 @@
 {
-    "id": "policies.test:124a751b-734b-5a3c-9ba4-b70dd29f2c13",
+    "id": "policies.test.Policy_1628416656:d45ac48e-d1c5-5309-9722-64d360251abd",
+    "location": "policies.test.Policy_1628416656",
     "name": "replace with name value",
     "version": "replace with version value",
     "doc": "replace with doc value",
     "target": "replace with target value",
-    "namespace": "policies.test",
     "type": "Policy",
     "allowed": {},
     "blocked": {},
     "enforced": {},
     "required": [],
     "possible": [],
-    "ts": "1628447057"
+    "ts": "1628516853"
 }

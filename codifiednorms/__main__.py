@@ -18,7 +18,7 @@ def check_repo(policy_class: type) -> None:
     for file in ls_repo():
         try:
             with open(file) as in_file:
-                policy = policy_class.subclass_from_dict(dict(json.load(in_file), **{'namespace': ns(file)}))
+                policy = policy_class.subclass_from_dict(dict(json.load(in_file), **{'location': location(file)}))
             if policy is None:
                 print(f'NOK {file.relative_to(repo_root)} "corrupted or not a policy"')
                 continue
@@ -51,30 +51,23 @@ def check_repo(policy_class: type) -> None:
 
 @enforce_strict_types
 def fix_repo(policy_class: type) -> None:
-    update_log = repo_root.joinpath('updates')
-    if update_log.exists():
-        with open(update_log) as in_file:
-            updated = json.load(in_file)
-
-    else:
-        updated = {}
+    updated = {}
     policy_repos = {c.__name__: [] for c in (BasePolicy, *BasePolicy.__subclasses__())}
     for file in ls_repo():
         try:
             with open(file) as in_file:
                 policy_data = json.load(in_file)
-                policy = BasePolicy.subclass_from_dict(dict(policy_data, **{'namespace': ns(file)}))
+                policy = BasePolicy.subclass_from_dict(dict(policy_data, **{'location': location(file)}))
             if isinstance(policy, BasePolicy):
                 policy_repos[policy.__class__.__name__] += [(file, policy_data, policy)]
         except (IOError, json.JSONDecodeError, KeyError, UnicodeDecodeError):
             pass
 
     def update(file: pathlib.Path, policy_data: dict, policy: BasePolicy) -> None:
-        if (old_id := policy_data.get('id')) != policy.id or policy_data.get('namespace') != policy.namespace:
+        if (old_id := policy_data.get('id')) != policy.id or policy_data.get('location') != policy.location:
             policy.dump(file)
             print(f'updated policy file "{file.relative_to(repo_root)}"', end=' ')
             if old_id:
-                updated.pop(policy.id, None)
                 updated[old_id] = policy.id
                 print(f'id "{old_id}" -> "{policy.id}"')
             else:
@@ -85,16 +78,16 @@ def fix_repo(policy_class: type) -> None:
     for file, policy_data, policy in policy_repos['PolicySet']:
         if any(pid in updated for pid in policy.policies + policy.exemptions):
             policy = PolicySet.from_dict(
-                dict(policy_data, **{'policies': tuple(updated.get(p, p) for p in policy.policies),
-                                     'exemptions': tuple(updated.get(p, p) for p in policy.exemptions)}))
+                dict(policy_data, **{
+                    'policies': tuple(updated.get(p) or Policy.get(p, approx_match=True) for p in policy.policies),
+                    'exemptions': tuple(updated.get(p) or Policy.get(p, approx_match=True) for p in policy.exemptions)
+                }))
         update(file, policy_data, policy)
     for file, policy_data, policy in policy_repos['Config']:
         if policy.applicable in updated:
             policy = Config.from_dict(
                 dict(policy_data, **{'applicable': updated.get(policy.applicable, policy.applicable)}))
         update(file, policy_data, policy)
-    with open(update_log, 'w') as out_file:
-        json.dump(updated, out_file, indent=4)
 
 
 @enforce_types
@@ -102,7 +95,7 @@ def create_new(policy_class: type) -> None:
     ts = str(int(time.time()))
     path = pathlib.Path(os.getcwd()).joinpath(f'{policy_class.__name__}_{ts}.json')
     if repo_root in path.parents:
-        policy = policy_class.from_dict(dict(namespace=ns(path), type=policy_class.__name__))
+        policy = policy_class.from_dict(dict(location=location(path), type=policy_class.__name__))
         policy.dump(path)
         print(f'created empty {policy_class.__name__} "{policy.id}" and saved as "{path.relative_to(repo_root)}"')
     else:
@@ -136,6 +129,6 @@ if __name__ == '__main__':
     if args.version:
         from .__init__ import __package__, __version__
 
-        print(f'{__package__}-{__version__}')
+        print(f'{__package__}-{__version__}: {pathlib.Path(__file__).parent}')
     else:
         funcs[args.action](policy_class=policy_types[args.policy_type])

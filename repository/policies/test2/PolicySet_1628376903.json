@@ -1,23 +1,23 @@
 {
-    "id": "policies.test2:26e62d68-37fc-54f3-b502-6327755ea7e4",
+    "id": "policies.test2.PolicySet_1628376903:bae7e629-c7d6-521e-921d-cdda539c7031",
+    "location": "policies.test2.PolicySet_1628376903",
     "name": "<policy name here>",
     "version": "<1628376903 replace with version>",
     "doc": "https://documentation.link",
     "target": "<target url or name here>",
-    "namespace": "policies.test2",
     "type": "PolicySet",
     "policies": [
-        "policies.test2:e48001c4-28b1-538f-b73f-58e77dfeafe1"
+        "policies.test2.Policy_1628371595:5ecddd3c-32da-5b07-8852-b92dcb631ef9"
     ],
     "exemptions": [],
     "policy": {
         "<target url or name here>": {
-            "id": "policies.test2:e48001c4-28b1-538f-b73f-58e77dfeafe1",
+            "id": "policies.test2.Policy_1628371595:5ecddd3c-32da-5b07-8852-b92dcb631ef9",
+            "location": "policies.test2.Policy_1628371595",
             "name": "<policy name here>",
             "version": "<1628371595 replace with version>",
             "doc": "https://documentation.link",
             "target": "<target url or name here>",
-            "namespace": "policies.test2",
             "type": "Policy",
             "allowed": {
                 "param11": [
@@ -41,5 +41,5 @@
             ]
         }
     },
-    "ts": "1628447057"
+    "ts": "1628516855"
 }

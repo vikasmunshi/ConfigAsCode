@@ -1,13 +1,13 @@
 {
-    "id": "policies.test:04adfef6-6e8f-5c56-9b68-e0147ceff82b",
+    "id": "policies.test.Config_1628416704:94955bb2-12aa-5391-ab2b-5c91a9ede114",
+    "location": "policies.test.Config_1628416704",
     "name": "replace with name value",
     "version": "replace with version value",
     "doc": "replace with doc value",
     "target": "replace with target value",
-    "namespace": "policies.test",
     "type": "Config",
     "assigned": {},
     "applicable": "",
     "policy": {},
-    "ts": "1628447057"
+    "ts": "1628516853"
 }

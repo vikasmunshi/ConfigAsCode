@@ -1,10 +1,10 @@
 {
-    "id": "policies.test2:4f8233e0-1912-5395-b1ab-f1341daa0aaf",
+    "id": "policies.test2.BasePolicy_1628374078:80ddc613-3186-5271-a035-cfd2a93c91ef",
+    "location": "policies.test2.BasePolicy_1628374078",
     "name": "<policy name here>",
     "version": "<1628374078 replace with version>",
     "doc": "https://documentation.link",
     "target": "<target url or name here>",
-    "namespace": "policies.test2",
     "type": "BasePolicy",
-    "ts": "1628447057"
+    "ts": "1628516853"
 }

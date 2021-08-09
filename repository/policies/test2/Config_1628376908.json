@@ -1,13 +1,13 @@
 {
-    "id": "policies.test2:b8a16005-45c7-5e77-9921-8100ecec7d28",
+    "id": "policies.test2.Config_1628376908:08de23f7-19d1-5f08-ba72-6c0e9e2363aa",
+    "location": "policies.test2.Config_1628376908",
     "name": "<policy name here>",
     "version": "<1628376908 replace with version>",
     "doc": "https://documentation.link",
     "target": "<target url or name here>",
-    "namespace": "policies.test2",
     "type": "Config",
     "assigned": {},
     "applicable": "test2:c6b98bce-deb3-5e32-8360-49bce84a3ab1",
     "policy": {},
-    "ts": "1628447057"
+    "ts": "1628516853"
 }
