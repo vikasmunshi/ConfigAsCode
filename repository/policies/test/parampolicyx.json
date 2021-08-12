@@ -1,0 +1,38 @@
+{
+    "doc": "replace with doc for parampolicy",
+    "type": "ParamPolicy",
+    "target": {
+        "doc": "replace with doc for target",
+        "type": "Target",
+        "name": "some target",
+        "url": null
+    },
+    "param": {
+        "doc": "replace with doc for param",
+        "type": "Param",
+        "name": "some param"
+    },
+    "allowed": {
+        "doc": "replace with doc for values",
+        "type": "Values",
+        "values": [
+            {
+                "doc": "replace with doc for value",
+                "type": "Value",
+                "value": "val0"
+            },
+            {
+                "doc": "replace with doc for value",
+                "type": "Value",
+                "value": "val1"
+            },
+            {
+                "doc": "replace with doc for value",
+                "type": "Value",
+                "value": "val2"
+            }
+        ]
+    },
+    "denied": [],
+    "enforced": null
+}
