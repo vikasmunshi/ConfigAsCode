@@ -1,35 +1,36 @@
 {
-    "doc": "replace with doc for parampolicy",
+    "identifier": "policies.test.parampolicyx",
     "type": "ParamPolicy",
+    "doc": "replace with doc for parampolicy",
     "target": {
-        "doc": "replace with doc for target",
         "type": "Target",
+        "doc": "replace with doc for target",
         "name": "some target",
         "url": null
     },
     "param": {
-        "doc": "replace with doc for param",
         "type": "Param",
+        "doc": "replace with doc for param",
         "name": "some param"
     },
     "allowed": {
-        "doc": "replace with doc for values",
         "type": "Values",
+        "doc": "replace with doc for values",
         "values": [
             {
-                "doc": "replace with doc for value",
                 "type": "Value",
-                "value": "val0"
-            },
-            {
                 "doc": "replace with doc for value",
-                "type": "Value",
                 "value": "val1"
             },
             {
-                "doc": "replace with doc for value",
                 "type": "Value",
+                "doc": "replace with doc for value",
                 "value": "val2"
+            },
+            {
+                "type": "Value",
+                "doc": "replace with doc for value",
+                "value": "val0"
             }
         ]
     },

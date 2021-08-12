@@ -1,21 +1,22 @@
 {
-    "doc": "replace with doc for values",
+    "identifier": "id:policies.test.valuesx",
     "type": "Values",
+    "doc": "replace with doc for values",
     "values": [
         {
-            "doc": "replace with doc for value",
             "type": "Value",
-            "value": "val0"
-        },
-        {
             "doc": "replace with doc for value",
-            "type": "Value",
             "value": "val1"
         },
         {
-            "doc": "replace with doc for value",
             "type": "Value",
+            "doc": "replace with doc for value",
             "value": "val2"
+        },
+        {
+            "type": "Value",
+            "doc": "replace with doc for value",
+            "value": "val0"
         }
     ]
 }

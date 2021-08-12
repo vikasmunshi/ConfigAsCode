@@ -16,19 +16,26 @@ import attr
 T = typing.TypeVar('T', bound='Base')
 TypeValue = typing.Union[bool, int, str]
 type_value = (bool, int, str)
-repo_root = pathlib.Path(os.getcwd().split('repository')[0]).joinpath('repository')
 
 
-def repo_path(identifier: str) -> pathlib.Path:
-    if identifier.startswith('id:'):
-        identifier = identifier.split(':', 1)[1]
-    return repo_root.joinpath(identifier.replace('.', '/') + '.json')
+@attr.s(frozen=True, kw_only=True)
+class Repo:
+    root = attr.ib(type=pathlib.Path,
+                   factory=lambda: pathlib.Path(os.getcwd().split('repository')[0]).joinpath('repository'))
+
+    def path(self, identifier: str) -> pathlib.Path:
+        if identifier.startswith('id:'):
+            identifier = identifier.split(':', 1)[1]
+        return self.root.joinpath(identifier.replace('.', '/')).with_suffix('.json')
+
+
+repo = Repo()
 
 
 @attr.s(frozen=True, kw_only=True)
 class Serializable:
-    doc = attr.ib(type=str, eq=False, validator=attr.validators.instance_of(str))
     type = attr.ib(type=str, eq=False, init=False)
+    doc = attr.ib(type=str, eq=False, validator=attr.validators.instance_of(str))
 
     @doc.default
     def default_doc(self) -> str:
@@ -39,16 +46,19 @@ class Serializable:
         return self.__class__.__name__
 
     def dump(self, identifier: str):
-        with open(repo_path(identifier), 'w') as out_file:
-            out_file.write(self.dumps())
-
-    def dumps(self) -> str:
-        return json.dumps(obj=attr.asdict(self, filter=lambda a, v: a.repr is True), indent=4)
+        with open(repo.path(identifier), 'w') as out_file:
+            json.dump(obj=dict({'identifier': identifier}, **attr.asdict(self, filter=lambda a, v: a.repr is True)),
+                      fp=out_file, indent=4)
 
     @classmethod
     def load(cls: typing.Type[T], identifier: str) -> T:
-        with open(repo_path(identifier)) as in_file:
-            return cls.loads(in_file.read())
+        with open(repo.path(identifier)) as in_file:
+            return json.load(
+                fp=in_file,
+                object_hook=lambda d: (globals().get(d.pop('type'), lambda **k: k), d.pop('identifier', None))[0](**d))
+
+    def dumps(self) -> str:
+        return json.dumps(obj=attr.asdict(self))
 
     @classmethod
     def loads(cls: typing.Type[T], data: str) -> T:
