@@ -2,12 +2,12 @@
 # -*- coding: utf-8 -*-
 """
 Python3 library to Manage Codified Norms and Config as Code
-Data Class
+Class Serializable, Param, Value, Values, ParamPolicy
 """
 from __future__ import annotations
 
-import collections.abc
 import json
+import os
 import pathlib
 import typing
 
@@ -16,6 +16,13 @@ import attr
 T = typing.TypeVar('T', bound='Base')
 TypeValue = typing.Union[bool, int, str]
 type_value = (bool, int, str)
+repo_root = pathlib.Path(os.getcwd().split('repository')[0]).joinpath('repository')
+
+
+def repo_path(identifier: str) -> pathlib.Path:
+    if identifier.startswith('id:'):
+        identifier = identifier.split(':', 1)[1]
+    return repo_root.joinpath(identifier.replace('.', '/') + '.json')
 
 
 @attr.s(frozen=True, kw_only=True)
@@ -31,17 +38,17 @@ class Serializable:
     def default_type(self) -> str:
         return self.__class__.__name__
 
-    def dump(self, file: pathlib.Path):
-        with open(file, 'w') as out_file:
-            json.dump(obj=attr.asdict(self, filter=lambda a, v: a.repr is True), fp=out_file, indent=4)
+    def dump(self, identifier: str):
+        with open(repo_path(identifier), 'w') as out_file:
+            out_file.write(self.dumps())
 
     def dumps(self) -> str:
         return json.dumps(obj=attr.asdict(self, filter=lambda a, v: a.repr is True), indent=4)
 
     @classmethod
-    def load(cls: typing.Type[T], file: pathlib.Path) -> T:
-        with open(file) as in_file:
-            return json.load(fp=file, object_hook=lambda d: globals().get(d.pop('type'), lambda **kw: kw)(**d))
+    def load(cls: typing.Type[T], identifier: str) -> T:
+        with open(repo_path(identifier)) as in_file:
+            return cls.loads(in_file.read())
 
     @classmethod
     def loads(cls: typing.Type[T], data: str) -> T:
@@ -49,13 +56,20 @@ class Serializable:
 
     @classmethod
     def cast_as(cls: typing.Type[T], data: typing.Union[T, typing.Iterable, dict]) -> T:
-        if isinstance(data, cls):
+        if data is None or not data or isinstance(data, cls):
             return data
-        if isinstance(data, collections.abc.Iterable):
+        if isinstance(data, str):
+            if data.startswith('id:'):
+                return cls.load(data)
+            # noinspection PyArgumentList
+            return cls(data)
+        if isinstance(data, (list, tuple, set)):
             if hasattr(cls, '__iter__'):
+                # noinspection PyArgumentList
                 return cls(data)
-            return tuple(v if isinstance(v, cls) else cls(v) for v in data)
-        if isinstance(args[0], dict):
+            # noinspection PyArgumentList
+            return set(v if isinstance(v, cls) else cls(v) for v in data)
+        if isinstance(data, dict):
             return cls(**data)
         raise ValueError(f'expected data to be {cls.__name__} or Iterable or Dict, got {data}')
 
@@ -82,41 +96,36 @@ class Value(Serializable):
 @attr.s(frozen=True)
 class Values(Serializable):
     values = attr.ib(type=typing.Tuple[Value], converter=Value.cast_as)
-    values_set = attr.ib(type=typing.Set[TypeValue], init=False, repr=False)
-
-    @values_set.default
-    def default_value_set(self) -> typing.Set[TypeValue]:
-        return set(v.value for v in self.values)
 
     def __bool__(self) -> bool:
         return bool(self.values)
 
     def __contains__(self, item: typing.Union[TypeValue, Value]) -> bool:
-        return item.value in self.values_set if isinstance(item, Value) else item in self.values_set
+        return item.value in self.values if isinstance(item, Value) else item in self.values
 
     def __iter__(self) -> typing.Generator[TypeValue, None, None]:
-        yield from self.values_set
+        yield from self.values
 
     def __add__(self, other: Values) -> Values:
-        return attr.evolve(self, values=self.values_set.union(other.values_set),
+        return attr.evolve(self, values=self.values.union(other.values),
                            doc=f'{self.doc} (+) {other.doc}')
 
     def __mul__(self, other: Values) -> Values:
-        return attr.evolve(self, values=self.values_set.intersection(other.values_set),
+        return attr.evolve(self, values=self.values.intersection(other.values),
                            doc=f'{self.doc} (*) {other.doc}')
 
     def __sub__(self, other: Values) -> Values:
-        return attr.evolve(self, values=self.values_set - other.values_set,
+        return attr.evolve(self, values=self.values - other.values,
                            doc=f'{self.doc} (-) {other.doc}')
 
 
 @attr.s(frozen=True)
 class ParamPolicy(Serializable):
-    target = attr.ib(type=Target, validator=attr.validators.instance_of(Target))
-    param = attr.ib(type=Param, validator=attr.validators.instance_of(Param))
+    target = attr.ib(type=Target, converter=Target.cast_as)
+    param = attr.ib(type=Param, converter=Param.cast_as)
     allowed = attr.ib(type=Values, converter=Values.cast_as)
     denied = attr.ib(type=Values, converter=Values.cast_as)
-    enforced = attr.ib(type=Value, converter=Value.cast_as)
+    enforced = attr.ib(type=Value, converter=Value.cast_as, default=None)
 
     def __add__(self, other: ParamPolicy) -> ParamPolicy:
         if self.target == other.target and self.param == other.param:
@@ -130,17 +139,28 @@ class ParamPolicy(Serializable):
 
 
 if __name__ == '__main__':
-    print(Param('some param'))
+    print(Param('some_param'))
     print(Value('some value'))
     print(Target('some target'))
-    print(valuesx := Values(['val1', 'val2']))
+    print(valuesx := Values(['val1', 'val2', 'val0']))
     print('val1' in valuesx)
     print(Value('val0') in valuesx)
-    print(valuex_str := valuesx.dumps())
+    print('check', valuex_str := valuesx.dumps())
     print(valuesx2 := Values.loads(valuex_str))
     print(valuesx + Values(['val2', 'val3']))
     print(valuesx * Values(['val2', 'val3']))
     print(valuesx - Values(['val2', 'val3']))
+    valuesx.dump(identifier='id:policies.test.valuesx')
+
+    print(parampolicyx := ParamPolicy(target=Target('some target'), param=('some param'),
+                                      allowed='id:policies.test.valuesx',
+                                      denied=[]
+                                      ))
+    print(parampolicyx)
+    parampolicyx.dump(identifier='policies.test.parampolicyx')
+    parampolicyx2 = ParamPolicy.load(identifier='id:policies.test.parampolicyx')
+    print(parampolicyx == parampolicyx2, parampolicyx2)
+    print([c.__name__ for c in Serializable.__subclasses__()])
 
     #
     #

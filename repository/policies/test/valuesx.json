@@ -1,0 +1,21 @@
+{
+    "doc": "replace with doc for values",
+    "type": "Values",
+    "values": [
+        {
+            "doc": "replace with doc for value",
+            "type": "Value",
+            "value": "val0"
+        },
+        {
+            "doc": "replace with doc for value",
+            "type": "Value",
+            "value": "val1"
+        },
+        {
+            "doc": "replace with doc for value",
+            "type": "Value",
+            "value": "val2"
+        }
+    ]
+}
