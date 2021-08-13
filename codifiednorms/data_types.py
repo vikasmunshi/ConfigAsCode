@@ -10,20 +10,20 @@ import json
 import os
 import pathlib
 import time
-import types
 import typing
 
 import attr
 
 T = typing.TypeVar('T', bound='Base')
-type_value = (set, bool, int, str)
-TypeValue = typing.Optional[typing.Union[typing.Set[typing.Union[bool, int, str]], bool, int, str]]
 
 
 @attr.s(frozen=True, kw_only=True)
 class Repo:
-    root = attr.ib(type=pathlib.Path,
-                   factory=lambda: pathlib.Path(os.getcwd().split('repository')[0]).joinpath('repository'))
+    root = attr.ib(type=pathlib.Path)
+
+    @root.default
+    def default_root(self):
+        return pathlib.Path(os.getcwd().split('repository')[0]).joinpath('repository')
 
     def path(self, identifier: str) -> pathlib.Path:
         identifier = identifier.split(':', 1)[1]
@@ -37,6 +37,15 @@ class Repo:
 repo = Repo()
 
 
+class Specials(str):
+    pass
+
+
+AllValues = Specials('Values.AllValues')
+NoValues = Specials('Values.NoValues')
+
+
+# noinspection PyArgumentList
 @attr.s(frozen=True, kw_only=True)
 class Serializable:
     id = attr.ib(type=str)
@@ -72,19 +81,22 @@ class Serializable:
         return json.loads(s=data, object_hook=lambda d: globals().get(d.pop('type'), lambda **kw: kw)(**d))
 
     @classmethod
-    def cast(cls: typing.Type[T], data: typing.Union[T, typing.Iterable, str], as_set: bool = False) \
-            -> typing.Optional[typing.Union[typing.Set[T], T]]:
-        if data is None or not data:
-            return set() if as_set else cls()
+    def cast(cls: typing.Type[T], data: typing.Union[T, typing.Iterable, bool, int, str]) \
+            -> typing.Optional[typing.Union[T, typing.Tuple[T]]]:
         if isinstance(data, cls):
-            return set(data) if as_set else data
-        if isinstance(data, str) and data.startswith('id:'):
-            return cls.load(data)
-        if as_set and isinstance(data, (list, tuple, set)):
-            return set(cls.cast(d) for d in data)
-        args = (data,) if isinstance(data, str) else data if isinstance(data, (list, tuple, str)) else tuple()
-        kwargs = data if isinstance(data, dict) else dict()
-        return cls(*args, **kwargs)
+            return data
+        if isinstance(data, str):
+            if data.startswith('id:'):
+                return cls.load(data)
+            if data.startswith('Values.'):
+                print('data', type(data), data)
+                return globals()[data.split('.')[1]]
+        if isinstance(data, (list, tuple, set)):
+            return tuple(cls.cast(d) for d in data)
+        if isinstance(data, dict):
+            return cls(**data)
+        if isinstance(data, (str, int, bool)):
+            return cls(data)
 
 
 @attr.s(frozen=True)
@@ -94,105 +106,125 @@ class Param(Serializable):
 
 @attr.s(frozen=True)
 class Target(Param):
-    url = attr.ib(type=str, default=None,
-                  validator=lambda i, a, v: v is None or (isinstance(v, str) and v.startswith('https://')))
+    url = attr.ib(type=str, default=None)
+
+    @url.validator
+    def validator_url(self, attribute, value):
+        if not (value is None or (isinstance(value, str) and value.startswith('https://'))):
+            raise ValueError(f'{value} is not a valid {attribute.name}')
 
 
 @attr.s(frozen=True)
 class Value(Serializable):
-    value = attr.ib(type=TypeValue, validator=attr.validators.optional(attr.validators.instance_of(type_value)),
-                    default=None)
+    value = attr.ib(type=typing.Union[bool, int, str],
+                    validator=attr.validators.instance_of((bool, int, str)))
 
     def __bool__(self) -> bool:
         return bool(self.value)
 
-    def __add__(self, other: Value) -> Value:
-        pass
-
 
 @attr.s(frozen=True)
 class Values(Serializable):
-    values = attr.ib(type=typing.Set[Value], converter=lambda v: Value.cast(v, as_set=True), factory=set)
+    values = attr.ib(type=typing.Union[typing.Tuple[Value, ...], Specials],
+                     converter=Value.cast, factory=tuple,
+                     validator=attr.validators.instance_of((tuple, Specials)))
 
     def __bool__(self) -> bool:
         return bool(self.values)
 
-    def __contains__(self, item: typing.Union[TypeValue, Value]) -> bool:
+    def __contains__(self, item: typing.Union[Value, bool, int, str]) -> bool:
+        if self.values is AllValues:
+            return True
+        if self.values is NoValues:
+            return False
         return item.value in self.values if isinstance(item, Value) else item in self.values
 
-    def __iter__(self) -> typing.Generator[TypeValue, None, None]:
+    def __iter__(self) -> typing.Generator[typing.Union[bool, int, str], None, None]:
+        if isinstance(self.values, Specials):
+            yield from tuple()
         yield from self.values
 
-    def __add__(self, other: Values) -> Values:
-        return Values(values=self.values.union(other.values), doc=f'{self.doc} (+) {other.doc}')
+    def __add__(self, other: Values) -> typing.Union[Values, Specials]:
+        """ add values, return values that are in either i.e. union of sets"""
+        if self.values is AllValues or other.values is AllValues:
+            return AllValues
+        if self.values is NoValues:
+            return other.values
+        if other.values is NoValues:
+            return self.values
+        values = self.values + tuple(v for v in other.values if v not in self.values)
+        return Values(values=values, doc=f'{self.doc} (+) {other.doc}')
 
-    def __mul__(self, other: Values) -> Values:
-        return Values(values=self.values.intersection(other.values), doc=f'{self.doc} (*) {other.doc}') \
-            if other else self
+    def __sub__(self, other: Values) -> typing.Union[Values, Specials]:
+        """ remove values from self that are also in other"""
+        if other.values is AllValues or self.values is NoValues:
+            return NoValues
+        if other.values is NoValues or self.values is AllValues:
+            return self.values
+        values = tuple(v for v in self.values if v not in other.values)
+        return Values(values=values, doc=f'{self.doc} (-) {other.doc}')
 
-    def __sub__(self, other: Values) -> Values:
-        return Values(values=self.values - other.values, doc=f'{self.doc} (-) {other.doc}')
-
-    def union(self, other: Values) -> Values:
-        return self + other
-
-    def intersection(self, other: Values) -> Values:
-        return self * other
-
-    def remove(self, other: Values) -> Values:
-        return self - other
+    def __mod__(self, other: Values) -> typing.Union[Values, Specials]:
+        """ return values that are in both i.e. intersection of sets"""
+        if self.values is AllValues:
+            return other.values
+        if other.values is AllValues:
+            return self.values
+        if self.values is NoValues or other.values is NoValues:
+            return NoValues
+        values = tuple(v for v in self.values if v in other.values)
+        return Values(values=values, doc=f'{self.doc} (%) {other.doc}')
 
 
 @attr.s(frozen=True)
 class ParamPolicy(Serializable):
-    target = attr.ib(type=Target, converter=Target.cast)
-    param = attr.ib(type=Param, converter=Param.cast)
-    allowed = attr.ib(type=Values, converter=Values.cast, factory=Values)
-    denied = attr.ib(type=Values, converter=Values.cast, factory=Values)
-    enforced = attr.ib(type=Value, converter=Value.cast, factory=Value)
+    target = attr.ib(type=Target, converter=Target.cast, validator=attr.validators.instance_of(Target))
+    param = attr.ib(type=Param, converter=Param.cast, validator=attr.validators.instance_of(Param))
+    allowed = attr.ib(type=Values, converter=Values.cast, default=Values(AllValues),
+                      validator=attr.validators.instance_of((Values, Specials)))
+    denied = attr.ib(type=Values, converter=Values.cast, default=Values(NoValues),
+                     validator=attr.validators.instance_of((Values, Specials)))
 
     def __add__(self, other: ParamPolicy) -> ParamPolicy:
         if self.target == other.target and self.param == other.param:
-            if self.enforced and other.enforced and self.enforced != other.enforced:
-                raise ValueError(f'cannot enforce {self.enforced} and {other.enforced} for {self.param}')
-            allowed = self.allowed.intersection(other.allowed).remove(other.denied)
-            denied = self.denied.union(other.denied)
-            enforced = self.enforced if self.enforced else other.enforced
+            allowed = self.allowed % other.allowed
+            denied = self.denied + other.denied
             doc = f'{self.doc} (+) {other.doc}'
-            return ParamPolicy(target=self.target, param=self.param, doc=doc,
-                               allowed=allowed, denied=denied, enforced=enforced)
+            return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
         raise NotImplemented
 
     def __sub__(self, other: ParamPolicy) -> ParamPolicy:
         if self.target == other.target and self.param == other.param:
-            if other.enforced or other.denied:
-                raise ValueError(f'trying to use policy {other.id} as an exemption is not possible')
             allowed = self.allowed + other.allowed
             denied = self.denied - other.allowed
-            enforced = self.enforced
             doc = f'{self.doc} (-) {other.doc}'
-            return ParamPolicy(target=self.target, param=self.param, doc=doc,
-                               allowed=allowed, denied=denied, enforced=enforced)
+            return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
         raise NotImplemented
 
 
 if __name__ == '__main__':
-    print(Param('some_param'))
-    print(Value('some value'))
-    print(Target('some target'))
+    print(p1 := Param('some_param'))
+    print(v1 := Value('some value'))
+    print(t1 := Target('some target', url='https://localhost'))
+    # noinspection PyTypeChecker
+    print(vany := Values('Values.AllValues'))
+    # noinspection PyTypeChecker
+    print(vnov := Values('Values.NoValues'))
+    print(vany2 := Values.load('id:policies.test.values_1628881815'))
+    print(v1 in vany, v1 in vnov)
+
     print(valuesx := Values(['val1', 'val2', 'val0'], id='id:policies.test.valuesx'))
     print('val1' in valuesx)
     print(Value('val0') in valuesx)
     print('check', valuex_str := valuesx.dumps())
     print(valuesx2 := Values.loads(valuex_str))
     print(valuesx + Values(['val2', 'val3']))
-    print(valuesx * Values(['val2', 'val3']))
+    print(valuesx % Values(['val2', 'val3']))
     print(valuesx - Values(['val2', 'val3']))
     valuesx.dump()
 
     print(parampolicyx := ParamPolicy(target=Target('some target'), param=('some param'),
                                       allowed='id:policies.test.valuesx',
-                                      denied=[],
                                       id='id:policies.test.parampolicyx'
                                       ))
     print(parampolicyx)
