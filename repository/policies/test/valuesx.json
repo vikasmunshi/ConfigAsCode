@@ -1,19 +1,22 @@
 {
-    "identifier": "id:policies.test.valuesx",
+    "id": "id:policies.test.valuesx",
     "type": "Values",
     "doc": "replace with doc for values",
     "values": [
         {
+            "id": "id:policies.test.value_1628839584",
             "type": "Value",
             "doc": "replace with doc for value",
             "value": "val1"
         },
         {
+            "id": "id:policies.test.value_1628839584",
             "type": "Value",
             "doc": "replace with doc for value",
             "value": "val2"
         },
         {
+            "id": "id:policies.test.value_1628839584",
             "type": "Value",
             "doc": "replace with doc for value",
             "value": "val0"

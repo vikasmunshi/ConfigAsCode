@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 import pathlib
+import time
 import typing
 
 import attr
@@ -24,9 +25,12 @@ class Repo:
                    factory=lambda: pathlib.Path(os.getcwd().split('repository')[0]).joinpath('repository'))
 
     def path(self, identifier: str) -> pathlib.Path:
-        if identifier.startswith('id:'):
-            identifier = identifier.split(':', 1)[1]
+        identifier = identifier.split(':', 1)[1]
         return self.root.joinpath(identifier.replace('.', '/')).with_suffix('.json')
+
+    def new(self, name: str) -> str:
+        path = pathlib.Path(os.getcwd()).relative_to(self.root).joinpath(f'{name}_{str(int(time.time()))}')
+        return f'id:{str(path).replace("/", ".")}'
 
 
 repo = Repo()
@@ -34,8 +38,13 @@ repo = Repo()
 
 @attr.s(frozen=True, kw_only=True)
 class Serializable:
+    id = attr.ib(type=str)
     type = attr.ib(type=str, eq=False, init=False)
     doc = attr.ib(type=str, eq=False, validator=attr.validators.instance_of(str))
+
+    @id.default
+    def default_id(self) -> str:
+        return repo.new(name=self.__class__.__name__.lower())
 
     @doc.default
     def default_doc(self) -> str:
@@ -45,20 +54,17 @@ class Serializable:
     def default_type(self) -> str:
         return self.__class__.__name__
 
-    def dump(self, identifier: str):
-        with open(repo.path(identifier), 'w') as out_file:
-            json.dump(obj=dict({'identifier': identifier}, **attr.asdict(self, filter=lambda a, v: a.repr is True)),
-                      fp=out_file, indent=4)
+    def dump(self):
+        with open(repo.path(self.id), 'w') as out_file:
+            out_file.write(self.dumps())
+
+    def dumps(self) -> str:
+        return json.dumps(obj=attr.asdict(self), indent=4)
 
     @classmethod
     def load(cls: typing.Type[T], identifier: str) -> T:
         with open(repo.path(identifier)) as in_file:
-            return json.load(
-                fp=in_file,
-                object_hook=lambda d: (globals().get(d.pop('type'), lambda **k: k), d.pop('identifier', None))[0](**d))
-
-    def dumps(self) -> str:
-        return json.dumps(obj=attr.asdict(self))
+            return cls.loads(in_file.read())
 
     @classmethod
     def loads(cls: typing.Type[T], data: str) -> T:
@@ -66,7 +72,7 @@ class Serializable:
 
     @classmethod
     def cast_as(cls: typing.Type[T], data: typing.Union[T, typing.Iterable, dict]) -> T:
-        if data is None or not data or isinstance(data, cls):
+        if data is None or isinstance(data, cls):
             return data
         if isinstance(data, str):
             if data.startswith('id:'):
@@ -117,16 +123,13 @@ class Values(Serializable):
         yield from self.values
 
     def __add__(self, other: Values) -> Values:
-        return attr.evolve(self, values=self.values.union(other.values),
-                           doc=f'{self.doc} (+) {other.doc}')
+        return Values(values=self.values.union(other.values), doc=f'{self.doc} (+) {other.doc}')
 
     def __mul__(self, other: Values) -> Values:
-        return attr.evolve(self, values=self.values.intersection(other.values),
-                           doc=f'{self.doc} (*) {other.doc}')
+        return Values(values=self.values.intersection(other.values), doc=f'{self.doc} (*) {other.doc}')
 
     def __sub__(self, other: Values) -> Values:
-        return attr.evolve(self, values=self.values - other.values,
-                           doc=f'{self.doc} (-) {other.doc}')
+        return Values(values=self.values - other.values, doc=f'{self.doc} (-) {other.doc}')
 
 
 @attr.s(frozen=True)
@@ -142,9 +145,23 @@ class ParamPolicy(Serializable):
             if self.enforced and other.enforced and self.enforced != other.enforced:
                 raise ValueError(f'cannot enforce {self.enforced} and {other.enforced} for {self.param}')
             allowed = (self.allowed * other.allowed) - other.denied
-            denied = self.allowed + other.allowed
+            denied = self.denied + other.denied
             enforced = self.enforced if self.enforced else other.enforced
-            return attr.evolve(self, allowed=allowed, denied=denied, enforced=enforced, )
+            doc = f'{self.doc} (+) {other.doc}'
+            return ParamPolicy(target=self.target, param=self.param, doc=doc,
+                               allowed=allowed, denied=denied, enforced=enforced)
+        raise NotImplemented
+
+    def __sub__(self, other: ParamPolicy) -> ParamPolicy:
+        if self.target == other.target and self.param == other.param:
+            if other.enforced or other.denied:
+                raise ValueError(f'trying to use policy {other.id} as an exemption is not possible')
+            allowed = self.allowed + other.allowed
+            denied = self.denied - other.allowed
+            enforced = self.enforced
+            doc = f'{self.doc} (-) {other.doc}'
+            return ParamPolicy(target=self.target, param=self.param, doc=doc,
+                               allowed=allowed, denied=denied, enforced=enforced)
         raise NotImplemented
 
 
@@ -152,7 +169,7 @@ if __name__ == '__main__':
     print(Param('some_param'))
     print(Value('some value'))
     print(Target('some target'))
-    print(valuesx := Values(['val1', 'val2', 'val0']))
+    print(valuesx := Values(['val1', 'val2', 'val0'], id='id:policies.test.valuesx'))
     print('val1' in valuesx)
     print(Value('val0') in valuesx)
     print('check', valuex_str := valuesx.dumps())
@@ -160,17 +177,17 @@ if __name__ == '__main__':
     print(valuesx + Values(['val2', 'val3']))
     print(valuesx * Values(['val2', 'val3']))
     print(valuesx - Values(['val2', 'val3']))
-    valuesx.dump(identifier='id:policies.test.valuesx')
+    valuesx.dump()
 
     print(parampolicyx := ParamPolicy(target=Target('some target'), param=('some param'),
                                       allowed='id:policies.test.valuesx',
-                                      denied=[]
+                                      denied=[],
+                                      id='id:policies.test.parampolicyx'
                                       ))
     print(parampolicyx)
-    parampolicyx.dump(identifier='policies.test.parampolicyx')
+    parampolicyx.dump()
     parampolicyx2 = ParamPolicy.load(identifier='id:policies.test.parampolicyx')
-    print(parampolicyx == parampolicyx2, parampolicyx2)
-    print([c.__name__ for c in Serializable.__subclasses__()])
+    print(parampolicyx + parampolicyx2)
 
     #
     #

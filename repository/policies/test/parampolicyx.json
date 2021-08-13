@@ -1,39 +1,50 @@
 {
-    "identifier": "policies.test.parampolicyx",
+    "id": "id:policies.test.parampolicyx",
     "type": "ParamPolicy",
     "doc": "replace with doc for parampolicy",
     "target": {
+        "id": "id:policies.test.target_1628839584",
         "type": "Target",
         "doc": "replace with doc for target",
         "name": "some target",
         "url": null
     },
     "param": {
+        "id": "id:policies.test.param_1628839584",
         "type": "Param",
         "doc": "replace with doc for param",
         "name": "some param"
     },
     "allowed": {
+        "id": "id:policies.test.valuesx",
         "type": "Values",
         "doc": "replace with doc for values",
         "values": [
             {
+                "id": "id:policies.test.value_1628839584",
                 "type": "Value",
                 "doc": "replace with doc for value",
                 "value": "val1"
             },
             {
+                "id": "id:policies.test.value_1628839584",
                 "type": "Value",
                 "doc": "replace with doc for value",
                 "value": "val2"
             },
             {
+                "id": "id:policies.test.value_1628839584",
                 "type": "Value",
                 "doc": "replace with doc for value",
                 "value": "val0"
             }
         ]
     },
-    "denied": [],
+    "denied": {
+        "id": "id:policies.test.values_1628839584",
+        "type": "Values",
+        "doc": "replace with doc for values",
+        "values": []
+    },
     "enforced": null
 }
