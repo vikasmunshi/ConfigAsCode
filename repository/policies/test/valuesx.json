@@ -4,22 +4,22 @@
     "doc": "replace with doc for values",
     "values": [
         {
-            "id": "id:policies.test.value_1628839584",
+            "id": "id:policies\\test\\value_1628862092",
             "type": "Value",
             "doc": "replace with doc for value",
             "value": "val1"
         },
         {
-            "id": "id:policies.test.value_1628839584",
-            "type": "Value",
-            "doc": "replace with doc for value",
-            "value": "val2"
-        },
-        {
-            "id": "id:policies.test.value_1628839584",
+            "id": "id:policies\\test\\value_1628862092",
             "type": "Value",
             "doc": "replace with doc for value",
             "value": "val0"
+        },
+        {
+            "id": "id:policies\\test\\value_1628862092",
+            "type": "Value",
+            "doc": "replace with doc for value",
+            "value": "val2"
         }
     ]
 }
