@@ -1,7 +1,7 @@
 {
-    "id": "id:policies.test.parampolicy_1628889123",
+    "id": "id:policies.test.px",
     "type": "ParamPolicy",
-    "doc": "replace with doc for parampolicy (+) replace with doc for parampolicy",
+    "doc": "replace with doc for parampolicy",
     "target": {
         "id": "id:policies.test.target_1628962335",
         "type": "Target",
@@ -16,9 +16,9 @@
         "name": "some param"
     },
     "allowed": {
-        "id": "id:policies.test.values_1628962335",
+        "id": "id:policies.test.valuesx",
         "type": "Values",
-        "doc": "replace with doc for values (%) replace with doc for values (-) replace with doc for values (+) replace with doc for values",
+        "doc": "replace with doc for values",
         "values": [
             {
                 "id": "id:policies.test.value_1628962335",
@@ -43,7 +43,7 @@
     "denied": {
         "id": "id:policies.test.values_1628962335",
         "type": "Values",
-        "doc": "replace with doc for values (+) replace with doc for values",
-        "values": []
+        "doc": "replace with doc for values",
+        "values": "values:AllValues"
     }
 }

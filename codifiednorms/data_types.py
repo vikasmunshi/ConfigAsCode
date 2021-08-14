@@ -15,15 +15,23 @@ import typing
 import attr
 
 T = typing.TypeVar('T', bound='Base')
+is_instance_of = attr.validators.instance_of
 
 
 @attr.s(frozen=True, kw_only=True)
 class Repo:
-    root = attr.ib(type=pathlib.Path)
+    root = attr.ib(type=pathlib.Path, validator=is_instance_of(pathlib.Path))
 
     @root.default
     def default_root(self):
-        return pathlib.Path(os.getcwd().split('repository')[0]).joinpath('repository')
+        return pathlib.Path(os.getcwd().split('repository', 1)[0]).joinpath('repository')
+
+    @root.validator
+    def validator_root(self, attribute, value):
+        if not value.exists():
+            raise ValueError(f'repository {attribute.name} {value} does not exist')
+        if not value.is_dir():
+            raise ValueError(f'repository {attribute.name} {value} is not a directory')
 
     def path(self, identifier: str) -> pathlib.Path:
         identifier = identifier.split(':', 1)[1]
@@ -33,6 +41,21 @@ class Repo:
         path = pathlib.Path(os.getcwd()).relative_to(self.root).joinpath(f'{name}_{str(int(time.time()))}')
         return f'id:{str(path).replace("/", ".")}'
 
+    def read(self, identifier: str) -> str:
+        try:
+            with open(self.path(identifier), 'r') as in_file:
+                return in_file.read()
+        except FileNotFoundError:
+            print(f'file {self.path(identifier)} does not exist')
+            raise
+        except IOError:
+            print(f'file {self.path(identifier)} cannot be read')
+            raise
+
+    def write(self, identifier: str, s: str):
+        with open(self.path(identifier), 'w') as out_file:
+            out_file.write(s)
+
 
 repo = Repo()
 
@@ -41,16 +64,14 @@ class Specials(str):
     pass
 
 
-AllValues = Specials('Values.AllValues')
-NoValues = Specials('Values.NoValues')
+AllValues = Specials('values:AllValues')
 
 
-# noinspection PyArgumentList
 @attr.s(frozen=True, kw_only=True)
 class Serializable:
     id = attr.ib(type=str)
     type = attr.ib(type=str, eq=False, init=False)
-    doc = attr.ib(type=str, eq=False, validator=attr.validators.instance_of(str))
+    doc = attr.ib(type=str, eq=False, validator=is_instance_of(str))
 
     @id.default
     def default_id(self) -> str:
@@ -65,16 +86,18 @@ class Serializable:
         return self.__class__.__name__
 
     def dump(self):
-        with open(repo.path(self.id), 'w') as out_file:
-            out_file.write(self.dumps())
+        repo.write(self.id, self.dumps())
 
     def dumps(self) -> str:
         return json.dumps(obj=attr.asdict(self), indent=4)
 
     @classmethod
     def load(cls: typing.Type[T], identifier: str) -> T:
-        with open(repo.path(identifier)) as in_file:
-            return cls.loads(in_file.read())
+        try:
+            return cls.loads(repo.read(identifier))
+        except (json.JSONDecodeError, TypeError) as e:
+            print(f'{type(e).__name__} while loading {identifier} from file')
+            raise
 
     @classmethod
     def loads(cls: typing.Type[T], data: str) -> T:
@@ -88,36 +111,37 @@ class Serializable:
         if isinstance(data, str):
             if data.startswith('id:'):
                 return cls.load(data)
-            if data.startswith('Values.'):
-                print('data', type(data), data)
-                return globals()[data.split('.')[1]]
+            if data.startswith('values:'):
+                return globals()[data.split(':')[1]]
+            # noinspection PyArgumentList
+            return cls(data)
+        if isinstance(data, (int, bool)):
+            # noinspection PyArgumentList
+            return cls(data)
         if isinstance(data, (list, tuple, set)):
             return tuple(cls.cast(d) for d in data)
         if isinstance(data, dict):
             return cls(**data)
-        if isinstance(data, (str, int, bool)):
-            return cls(data)
 
 
 @attr.s(frozen=True)
 class Param(Serializable):
-    name = attr.ib(type=str, validator=attr.validators.instance_of(str))
+    name = attr.ib(type=str, validator=is_instance_of(str))
 
 
 @attr.s(frozen=True)
 class Target(Param):
-    url = attr.ib(type=str, default=None)
+    url = attr.ib(type=str, default=None, validator=attr.validators.optional(is_instance_of(str)))
 
     @url.validator
     def validator_url(self, attribute, value):
-        if not (value is None or (isinstance(value, str) and value.startswith('https://'))):
+        if value and not value.startswith('https://'):
             raise ValueError(f'{value} is not a valid {attribute.name}')
 
 
 @attr.s(frozen=True)
 class Value(Serializable):
-    value = attr.ib(type=typing.Union[bool, int, str],
-                    validator=attr.validators.instance_of((bool, int, str)))
+    value = attr.ib(type=typing.Union[bool, int, str], validator=is_instance_of((bool, int, str)))
 
     def __bool__(self) -> bool:
         return bool(self.value)
@@ -125,9 +149,18 @@ class Value(Serializable):
 
 @attr.s(frozen=True)
 class Values(Serializable):
-    values = attr.ib(type=typing.Union[typing.Tuple[Value, ...], Specials],
-                     converter=Value.cast, factory=tuple,
-                     validator=attr.validators.instance_of((tuple, Specials)))
+    values = attr.ib(type=typing.Union[typing.Tuple[Value, ...], Specials], converter=Value.cast, factory=tuple,
+                     validator=is_instance_of((tuple, Specials)))
+
+    @values.validator
+    def validator_values(self, attribute, value):
+        if isinstance(value, Specials):
+            return
+        errors = ''
+        for v in value:
+            errors += '' if isinstance(v, Value) else f'{v} is not of type Value'
+        if errors:
+            raise ValueError(errors.strip())
 
     def __bool__(self) -> bool:
         return bool(self.values)
@@ -135,8 +168,6 @@ class Values(Serializable):
     def __contains__(self, item: typing.Union[Value, bool, int, str]) -> bool:
         if self.values is AllValues:
             return True
-        if self.values is NoValues:
-            return False
         return item.value in self.values if isinstance(item, Value) else item in self.values
 
     def __iter__(self) -> typing.Generator[typing.Union[bool, int, str], None, None]:
@@ -147,21 +178,19 @@ class Values(Serializable):
     def __add__(self, other: Values) -> typing.Union[Values, Specials]:
         """ add values, return values that are in either i.e. union of sets"""
         if self.values is AllValues or other.values is AllValues:
-            return AllValues
-        if self.values is NoValues:
-            return other.values
-        if other.values is NoValues:
-            return self.values
-        values = self.values + tuple(v for v in other.values if v not in self.values)
+            values = AllValues
+        else:
+            values = self.values + tuple(v for v in other.values if v not in self.values)
         return Values(values=values, doc=f'{self.doc} (+) {other.doc}')
 
     def __sub__(self, other: Values) -> typing.Union[Values, Specials]:
         """ remove values from self that are also in other"""
-        if other.values is AllValues or self.values is NoValues:
-            return NoValues
-        if other.values is NoValues or self.values is AllValues:
-            return self.values
-        values = tuple(v for v in self.values if v not in other.values)
+        if self.values is AllValues:
+            values = self.values
+        elif other.values is AllValues:
+            values = tuple()
+        else:
+            values = tuple(v for v in self.values if v not in other.values)
         return Values(values=values, doc=f'{self.doc} (-) {other.doc}')
 
     def __mod__(self, other: Values) -> typing.Union[Values, Specials]:
@@ -170,25 +199,25 @@ class Values(Serializable):
             return other.values
         if other.values is AllValues:
             return self.values
-        if self.values is NoValues or other.values is NoValues:
-            return NoValues
         values = tuple(v for v in self.values if v in other.values)
         return Values(values=values, doc=f'{self.doc} (%) {other.doc}')
 
 
+AllVals = Values(values=AllValues)
+NoVals = Values()
+
+
 @attr.s(frozen=True)
 class ParamPolicy(Serializable):
-    target = attr.ib(type=Target, converter=Target.cast, validator=attr.validators.instance_of(Target))
-    param = attr.ib(type=Param, converter=Param.cast, validator=attr.validators.instance_of(Param))
-    allowed = attr.ib(type=Values, converter=Values.cast, default=Values(AllValues),
-                      validator=attr.validators.instance_of((Values, Specials)))
-    denied = attr.ib(type=Values, converter=Values.cast, default=Values(NoValues),
-                     validator=attr.validators.instance_of((Values, Specials)))
+    target = attr.ib(type=Target, converter=Target.cast, validator=is_instance_of(Target))
+    param = attr.ib(type=Param, converter=Param.cast, validator=is_instance_of(Param))
+    allowed = attr.ib(type=Values, converter=Values.cast, default=AllVals, validator=is_instance_of(Values))
+    denied = attr.ib(type=Values, converter=Values.cast, default=NoVals, validator=is_instance_of(Values))
 
     def __add__(self, other: ParamPolicy) -> ParamPolicy:
         if self.target == other.target and self.param == other.param:
-            allowed = self.allowed % other.allowed
             denied = self.denied + other.denied
+            allowed = (self.allowed % other.allowed) - denied
             doc = f'{self.doc} (+) {other.doc}'
             return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
         raise NotImplemented
@@ -201,15 +230,30 @@ class ParamPolicy(Serializable):
             return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
         raise NotImplemented
 
+    def __bool__(self) -> bool:
+        if self.denied is AllValues:
+            return False
+        return bool(self.allowed - self.denied)
+
+    def __matmul__(self, value: typing.Union[bool, int, str]) -> bool:
+        """ Policy @ Value"""
+        return value in self.allowed and value not in self.denied
+
+
+@attr.s(frozen=True)
+class Policy(Serializable):
+    policy_expression = attr.ib(type=str, validator=is_instance_of(str))
+
 
 if __name__ == '__main__':
     print(p1 := Param('some_param'))
     print(v1 := Value('some value'))
     print(t1 := Target('some target', url='https://localhost'))
+    print(vs1 := Values([v1, Value('other')]))
     # noinspection PyTypeChecker
-    print(vany := Values('Values.AllValues'))
+    print(vany := Values('values:AllValues'))
     # noinspection PyTypeChecker
-    print(vnov := Values('Values.NoValues'))
+    print(vnov := Values())
     print(vany2 := Values.load('id:policies.test.values_1628881815'))
     print(v1 in vany, v1 in vnov)
 
@@ -231,3 +275,11 @@ if __name__ == '__main__':
     parampolicyx.dump()
     parampolicyx2 = ParamPolicy.load(identifier='id:policies.test.parampolicyx')
     print(parampolicyx + parampolicyx2)
+    attr.evolve(parampolicyx + parampolicyx2, id='id:policies.test.parampolicy_1628889123').dump()
+
+    print(bool(px := ParamPolicy(target=Target('some target'), param=('some param'),
+                                 allowed='id:policies.test.valuesx',
+                                 denied=Values('values:AllValues'),
+                                 id='id:policies.test.px'
+                                 )))
+    px.dump()

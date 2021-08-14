@@ -2,5 +2,5 @@
     "id": "id:policies.test.values_1628881815",
     "type": "Values",
     "doc": "replace with doc for values",
-    "values": "Values.AllValues"
+    "values": "values:AllValues"
 }
