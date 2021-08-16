@@ -3,14 +3,14 @@
     "type": "ParamPolicy",
     "doc": "replace with doc for parampolicy",
     "target": {
-        "id": "id:policies.test.target_1628962335",
+        "id": "id:policies.test.target_1628967860",
         "type": "Target",
         "doc": "replace with doc for target",
         "name": "some target",
         "url": null
     },
     "param": {
-        "id": "id:policies.test.param_1628962335",
+        "id": "id:policies.test.param_1628967860",
         "type": "Param",
         "doc": "replace with doc for param",
         "name": "some param"
@@ -21,19 +21,19 @@
         "doc": "replace with doc for values",
         "values": [
             {
-                "id": "id:policies.test.value_1628962335",
+                "id": "id:policies.test.value_1628967860",
                 "type": "Value",
                 "doc": "replace with doc for value",
                 "value": "val1"
             },
             {
-                "id": "id:policies.test.value_1628962335",
+                "id": "id:policies.test.value_1628967860",
                 "type": "Value",
                 "doc": "replace with doc for value",
                 "value": "val2"
             },
             {
-                "id": "id:policies.test.value_1628962335",
+                "id": "id:policies.test.value_1628967860",
                 "type": "Value",
                 "doc": "replace with doc for value",
                 "value": "val0"
@@ -41,7 +41,7 @@
         ]
     },
     "denied": {
-        "id": "id:policies.test.values_1628962335",
+        "id": "id:policies.test.values_1628967860",
         "type": "Values",
         "doc": "replace with doc for values",
         "values": "values:AllValues"
