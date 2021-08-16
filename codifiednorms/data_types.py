@@ -6,7 +6,8 @@ Class Serializable, Param, Value, Values, ParamPolicy
 """
 from __future__ import annotations
 
-import collections
+import functools
+import itertools
 import json
 import os
 import pathlib
@@ -49,7 +50,8 @@ class Repo:
 
     def new(self, name: str) -> str:
         path = pathlib.Path(os.getcwd()).relative_to(self.root).joinpath(f'{name}_{str(int(time.time()))}')
-        return f'id:{str(path).replace("/", ".")}'
+        path = str(path).replace('/', '.').replace('\\', '.')
+        return f'id:{path}'
 
     def read(self, identifier: str) -> str:
         try:
@@ -266,13 +268,19 @@ class ParamPolicy(Serializable):
 
     @property
     def as_policy_set(self: ParamPolicy) -> PolicySet:
-        return PolicySet(doc=f'Policy Set: {self.doc}', policies={self.target.id: {self.param.id: self}})
+        return PolicySet(doc=f'Policy Set: {self.doc}',
+                         policies=policies_as_policy_set(ParamPolicies((self,)).policies))
 
 
-@attr.s(frozen=True, kw_only=True)
-class ParamPolicies(ParamPolicy):
-    policies = attr.ib(type=tuple[ParamPolicy, ...], converter=ParamPolicy.cast, factory=tuple,
-                       validator=attr.validators.deep_iterable(is_instance_of(ParamPolicy), is_instance_of(tuple)))
+@attr.s(frozen=True)
+class ParamPolicies(Serializable):
+    policies = attr.ib(type=tuple[ParamPolicy, ...], converter=ParamPolicy.cast)
+
+
+def policies_as_policy_set(policies: tuple[ParamPolicy, ...]) -> dict:
+    return {t.id: {p.id: functools.reduce(lambda a, b: a + b, list(y))
+                   for p, y in itertools.groupby(x, key=lambda j: j.param)}
+            for t, x in itertools.groupby(policies, key=lambda i: i.target)}
 
 
 @attr.s(frozen=True)
@@ -284,18 +292,13 @@ class PolicySet(Serializable):
             return self + other.as_policy_set
         result = {}
         for target_id in set(self.policies.keys()).union(set(other.policies.keys())):
-            print(target_id)
             result[target_id] = {}
             self_policies_target = self.policies.get(target_id, {})
             other_policies_target = other.policies.get(target_id, {})
             for param_id in set(self_policies_target.keys()).union(other_policies_target.keys()):
-                print(target_id, param_id)
                 p1 = self_policies_target.get(param_id, None)
                 p2 = other_policies_target.get(param_id, None)
-                print(target_id, param_id, p1.id if p1 else None, p2.id if p2 else None)
-                if p1 and p2:
-                    print('p1 p2 type',type(p1), type(p2), p1.param==p2.param)
-                result[target_id][param_id] = (p1,p2) if (p1 and p2) else (p1 or p2)
+                result[target_id][param_id] = (p1, p2) if (p1 and p2) else (p1 or p2)
         return PolicySet(policies=result)
 
     def __sub__(self, other: typing.Union[ParamPolicy, PolicySet]) -> PolicySet:
@@ -303,24 +306,20 @@ class PolicySet(Serializable):
             return self - other.as_policy_set
 
 
-@attr.s(frozen=True)
-class Policy(Serializable):
-    policy = attr.ib(type=ParamPolicy, converter=ParamPolicy.cast, validator=is_instance_of(ParamPolicy))
-
-
 if __name__ == '__main__':
     pe = PolicySet(
         id='id:policies.test.policy_1628969977',
         policies='expression: id:policies.test.parampolicy_1628889123 + (id:policies.test.parampolicyx - id:policies.test.px)'
     )
-    # print(pe)
+    print(pe)
     parampolicyx = ParamPolicy(target=Target('other target'), param=('other param'),
                                allowed='id:policies.test.valuesx',
                                id='id:policies.test.parampolicyx')
     parampolicy = ParamPolicy(target=Target('some target'), param=('other param'),
                               allowed='id:policies.test.valuesx',
                               id='id:policies.test.parampolicyx')
-    print((parampolicyx + parampolicy))
+    print(pe + parampolicy + parampolicyx)
+    # print((parampolicyx + parampolicy))
 
     exit(0)
 
