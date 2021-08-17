@@ -6,6 +6,7 @@ Class Serializable, Param, Value, Values, ParamPolicy
 """
 from __future__ import annotations
 
+import functools
 import json
 import os
 import pathlib
@@ -67,10 +68,11 @@ class Repo:
             out_file.write(s)
 
     def put(self, obj: Serializable):
-        self.repo_cache[obj.id] = obj
+        if obj.id not in self.repo_cache:
+            self.repo_cache[obj.id] = obj
 
     def get(self, identifier: str) -> Serializable:
-        return self.repo_cache[identifier]
+        return self.repo_cache.get(identifier, None)
 
     @property
     def list(self) -> list[str, ...]:
@@ -145,13 +147,13 @@ class Serializable:
             return data
         if isinstance(data, str):
             if data.startswith('id:'):
-                return cls.load(data)
+                return repo.get(data) or cls.load(data)
             if data.startswith('values:'):
                 return globals()[data.split(':', 1)[1]]
             if data.startswith('expression:'):
                 exp_str = data.split(':', 1)[1]
                 value_s = {escape_colon_dot(k): globals()[k.split(':', 1)[1]] for k in set(values_re.findall(exp_str))}
-                id_s = {escape_colon_dot(k): cls.load(k) for k in set(id_re.findall(exp_str))}
+                id_s = {escape_colon_dot(k): (repo.get(k) or cls.load(k)) for k in set(id_re.findall(exp_str))}
                 return eval(escape_colon_dot(exp_str), globals(), dict(id_s, **value_s))
             # noinspection PyArgumentList
             return cls(data)
@@ -260,7 +262,7 @@ class ParamPolicy(Serializable):
             allowed = (self.allowed % other.allowed) - denied
             doc = f'{self.doc} (+) {other.doc}'
             return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
-        return NotImplemented
+        return ParamsPolicies(policy={self.id: self, other.id: other})
 
     def __sub__(self, other: ParamPolicy) -> typing.Union[ParamPolicy, ParamsPolicies]:
         if self.target == other.target and self.param == other.param:
@@ -268,7 +270,10 @@ class ParamPolicy(Serializable):
             denied = self.denied - other.allowed
             doc = f'{self.doc} (-) {other.doc}'
             return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
-        return NotImplemented
+        return ParamsPolicies(policy={self.id: self, other.id: - other})
+
+    def __neg__(self) -> ParamPolicy:
+        return attr.evolve(self, denied=NoVals, doc=f'(-) {self.doc}')
 
     def __bool__(self: ParamPolicy) -> bool:
         if self.denied is AllValues:
@@ -282,11 +287,60 @@ class ParamPolicy(Serializable):
 
 @attr.s(frozen=True)
 class ParamsPolicies(Serializable):
-    policies = attr.ib(type=typing.Dict[str, ParamPolicy])
+    policies = attr.ib(type=tuple[typing.Union[str, ParamPolicy], ...], factory=tuple,
+                       validator=attr.validators.deep_iterable(is_instance_of(ParamPolicy),
+                                                               is_instance_of((str, ParamPolicy))))
+    expression = attr.ib(type=str, default='', validator=is_instance_of(str))
+    policy = attr.ib(type=dict[str, ParamPolicy])
+
+    @policy.default
+    def policy_default(self):
+        if self.expression:
+            return ParamPolicy.cast(self.expression)
+        if self.policies:
+            return functools.reduce(lambda x, y: x + y, (ParamPolicy.cast(p) for p in self.policies))
+        return {}
+
+    @functools.cached_property
+    def policy_map(self) -> dict[str, dict[str, str]]:
+        policy_map = {}
+        for pid, p in self.policy.items():
+            if p.target.id not in policy_map:
+                policy_map[p.target.id] = {}
+            policy_map[p.target.id][p.param.id] = pid
+        return policy_map
+
+    def __add__(self, other: typing.Union[ParamsPolicies, ParamPolicy]) -> ParamsPolicies:
+        if isinstance(other, ParamPolicy):
+            if other.target.id not in self.policy_map or other.param.id not in self.policy_map[other.target.id]:
+                policy = dict(self.policy, **{other.id: other})
+                doc = f'{self.doc} (+) {other.doc}'
+                return ParamsPolicies(policy=policy, doc=doc)
+            else:
+                param_policy = self.policy.pop(self.policy_map[other.target.id][other.param.id]) + other
+                policy = dict(self.policy, **{param_policy.id: param_policy})
+                doc = f'{self.doc} (+) {param_policy.doc}'
+                return ParamsPolicies(policy=policy, doc=doc)
+        return functools.reduce(lambda a, b: a + b, other.policy.values(), self)
+
+    def __sub__(self, other: typing.Union[ParamsPolicies, ParamPolicy]) -> ParamsPolicies:
+        if isinstance(other, ParamPolicy):
+            if other.target.id not in self.policy_map or other.param.id not in self.policy_map[other.target.id]:
+                policy = dict(self.policy, **{other.id: - other})
+                doc = f'{self.doc} (-) {other.doc}'
+                return ParamsPolicies(policy=policy, doc=doc)
+            else:
+                param_policy = self.policy.pop(self.policy_map[other.target.id][other.param.id]) - other
+                policy = dict(self.policy, **{param_policy.id: param_policy})
+                doc = f'{self.doc} (-) {param_policy.doc}'
+                return ParamsPolicies(policy=policy, doc=doc)
+        return functools.reduce(lambda a, b: a + b, other.policy.values(), self)
 
 
 if __name__ == '__main__':
-    param1 = Param.load('id:policies.test.param_param1')
-    param1.dump()
-    print(param1)
+    param1 = Param.load(identifier='id:policies.test.param_param1')
+    # param1.dump()
+    target1 = Target.load(identifier='id:policies.test.target_target1')
+    # target1.dump()
+    print(param1, target1)
     print(repo.list)

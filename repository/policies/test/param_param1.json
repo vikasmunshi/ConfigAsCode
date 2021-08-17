@@ -1,0 +1,6 @@
+{
+    "id": "id:policies.test.param_param1",
+    "type": "Param",
+    "doc": "doc for param",
+    "name": "param1"
+}
