@@ -6,15 +6,12 @@ Class Serializable, Param, Value, Values, ParamPolicy
 """
 from __future__ import annotations
 
-import functools
-import itertools
 import json
 import os
 import pathlib
 import re
 import time
 import typing
-from typing import Callable
 
 import attr
 
@@ -25,6 +22,7 @@ is_instance_of = attr.validators.instance_of
 @attr.s(frozen=True, kw_only=True)
 class Repo:
     root = attr.ib(type=pathlib.Path, validator=is_instance_of(pathlib.Path))
+    repo_cache = attr.ib(type=dict, factory=dict, init=False)
 
     @root.default
     def root_default(self):
@@ -49,7 +47,7 @@ class Repo:
         return True
 
     def new(self, name: str) -> str:
-        path = pathlib.Path(os.getcwd()).relative_to(self.root).joinpath(f'{name}_{str(int(time.time()))}')
+        path = pathlib.Path(os.getcwd()).relative_to(self.root).joinpath(f'{name}_{str(time.time())}')
         path = str(path).replace('/', '.').replace('\\', '.')
         return f'id:{path}'
 
@@ -68,6 +66,16 @@ class Repo:
         with open(self.path(identifier), 'w') as out_file:
             out_file.write(s)
 
+    def put(self, obj: Serializable):
+        self.repo_cache[obj.id] = obj
+
+    def get(self, identifier: str) -> Serializable:
+        return self.repo_cache[identifier]
+
+    @property
+    def list(self) -> list[str, ...]:
+        return list(self.repo_cache.keys())
+
 
 repo = Repo()
 
@@ -79,7 +87,7 @@ class Specials(str):
 AllValues = Specials('values:AllValues')
 id_re = re.compile(r'id:[^\s)(=/*-+]*')
 values_re = re.compile(r'values:[^\s)(=/*-+]*')
-escape_colon_dot: Callable[[str], str] = lambda key: key.replace(':', '_').replace('.', '_')
+escape_colon_dot: typing.Callable[[str], str] = lambda key: key.replace(':', '_').replace('.', '_')
 
 
 @attr.s(frozen=True, kw_only=True)
@@ -87,6 +95,9 @@ class Serializable:
     id = attr.ib(type=str, validator=is_instance_of(str))
     type = attr.ib(type=str, eq=False, init=False)
     doc = attr.ib(type=str, eq=False, validator=is_instance_of(str))
+
+    def __attrs_post_init__(self):
+        repo.put(obj=self)
 
     @id.default
     def id_default(self) -> str:
@@ -103,7 +114,7 @@ class Serializable:
 
     @doc.default
     def doc_default(self) -> str:
-        return f'replace with doc for {self.__class__.__name__.lower()}'
+        return f'doc for {self.__class__.__name__.lower()}'
 
     def dump(self):
         repo.write(self.id, self.dumps())
@@ -114,7 +125,11 @@ class Serializable:
     @classmethod
     def load(cls: typing.Type[T], identifier: str) -> T:
         try:
-            return cls.loads(repo.read(identifier))
+            obj = cls.loads(repo.read(identifier))
+            if obj.id != identifier:
+                obj = attr.evolve(obj, id=identifier)
+                obj.dump()
+            return obj
         except (json.JSONDecodeError, TypeError) as e:
             print(f'{type(e).__name__} while loading {identifier} from file')
             raise
@@ -137,10 +152,7 @@ class Serializable:
                 exp_str = data.split(':', 1)[1]
                 value_s = {escape_colon_dot(k): globals()[k.split(':', 1)[1]] for k in set(values_re.findall(exp_str))}
                 id_s = {escape_colon_dot(k): cls.load(k) for k in set(id_re.findall(exp_str))}
-                obj = eval(escape_colon_dot(exp_str), globals(), dict(id_s, **value_s))
-                if isinstance(obj, ParamPolicy) and cls is ParamPolicies:
-                    return obj.as_policy_set.policies
-                return obj
+                return eval(escape_colon_dot(exp_str), globals(), dict(id_s, **value_s))
             # noinspection PyArgumentList
             return cls(data)
         if isinstance(data, (int, bool)):
@@ -149,9 +161,6 @@ class Serializable:
         if isinstance(data, (list, tuple, set)):
             return tuple(cls.cast(d) for d in data)
         if isinstance(data, dict):
-            if cls is ParamPolicies:
-                # noinspection PyArgumentList
-                return data
             return cls(**data)
 
 
@@ -234,28 +243,32 @@ class Values(Serializable):
         return Values(values=values, doc=f'{self.doc} (%) {other.doc}')
 
 
+AllVals = Values(AllValues, id='id:AllVals')
+NoVals = Values(id='id:NoVals')
+
+
 @attr.s(frozen=True)
 class ParamPolicy(Serializable):
     target = attr.ib(type=Target, converter=Target.cast, validator=is_instance_of(Target))
     param = attr.ib(type=Param, converter=Param.cast, validator=is_instance_of(Param))
-    allowed = attr.ib(type=Values, converter=Values.cast, default=Values(AllValues), validator=is_instance_of(Values))
-    denied = attr.ib(type=Values, converter=Values.cast, default=Values(), validator=is_instance_of(Values))
+    allowed = attr.ib(type=Values, converter=Values.cast, default=AllVals, validator=is_instance_of(Values))
+    denied = attr.ib(type=Values, converter=Values.cast, default=NoVals, validator=is_instance_of(Values))
 
-    def __add__(self: ParamPolicy, other: ParamPolicy) -> typing.Union[ParamPolicy, PolicySet]:
+    def __add__(self: ParamPolicy, other: ParamPolicy) -> typing.Union[ParamPolicy, ParamsPolicies]:
         if self.target == other.target and self.param == other.param:
             denied = self.denied + other.denied
             allowed = (self.allowed % other.allowed) - denied
             doc = f'{self.doc} (+) {other.doc}'
             return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
-        return self.as_policy_set + other
+        return NotImplemented
 
-    def __sub__(self: ParamPolicy, other: ParamPolicy) -> typing.Union[ParamPolicy, PolicySet]:
+    def __sub__(self, other: ParamPolicy) -> typing.Union[ParamPolicy, ParamsPolicies]:
         if self.target == other.target and self.param == other.param:
             allowed = self.allowed + other.allowed
             denied = self.denied - other.allowed
             doc = f'{self.doc} (-) {other.doc}'
             return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
-        return self.as_policy_set - other
+        return NotImplemented
 
     def __bool__(self: ParamPolicy) -> bool:
         if self.denied is AllValues:
@@ -266,97 +279,14 @@ class ParamPolicy(Serializable):
         """ Policy @ Value"""
         return value in self.allowed and value not in self.denied
 
-    @property
-    def as_policy_set(self: ParamPolicy) -> PolicySet:
-        return PolicySet(doc=f'Policy Set: {self.doc}',
-                         policies=policies_as_policy_set(ParamPolicies((self,)).policies))
-
 
 @attr.s(frozen=True)
-class ParamPolicies(Serializable):
-    policies = attr.ib(type=tuple[ParamPolicy, ...], converter=ParamPolicy.cast)
-
-
-def policies_as_policy_set(policies: tuple[ParamPolicy, ...]) -> dict:
-    return {t.id: {p.id: functools.reduce(lambda a, b: a + b, list(y))
-                   for p, y in itertools.groupby(x, key=lambda j: j.param)}
-            for t, x in itertools.groupby(policies, key=lambda i: i.target)}
-
-
-@attr.s(frozen=True)
-class PolicySet(Serializable):
-    policies = attr.ib(type=dict[str, dict[str, ParamPolicy]], converter=ParamPolicies.cast)
-
-    def __add__(self: PolicySet, other: typing.Union[ParamPolicy, PolicySet]) -> PolicySet:
-        if isinstance(other, ParamPolicy):
-            return self + other.as_policy_set
-        result = {}
-        for target_id in set(self.policies.keys()).union(set(other.policies.keys())):
-            result[target_id] = {}
-            self_policies_target = self.policies.get(target_id, {})
-            other_policies_target = other.policies.get(target_id, {})
-            for param_id in set(self_policies_target.keys()).union(other_policies_target.keys()):
-                p1 = self_policies_target.get(param_id, None)
-                p2 = other_policies_target.get(param_id, None)
-                result[target_id][param_id] = (p1, p2) if (p1 and p2) else (p1 or p2)
-        return PolicySet(policies=result)
-
-    def __sub__(self, other: typing.Union[ParamPolicy, PolicySet]) -> PolicySet:
-        if isinstance(other, ParamPolicy):
-            return self - other.as_policy_set
+class ParamsPolicies(Serializable):
+    policies = attr.ib(type=typing.Dict[str, ParamPolicy])
 
 
 if __name__ == '__main__':
-    pe = PolicySet(
-        id='id:policies.test.policy_1628969977',
-        policies='expression: id:policies.test.parampolicy_1628889123 + (id:policies.test.parampolicyx - id:policies.test.px)'
-    )
-    print(pe)
-    parampolicyx = ParamPolicy(target=Target('other target'), param=('other param'),
-                               allowed='id:policies.test.valuesx',
-                               id='id:policies.test.parampolicyx')
-    parampolicy = ParamPolicy(target=Target('some target'), param=('other param'),
-                              allowed='id:policies.test.valuesx',
-                              id='id:policies.test.parampolicyx')
-    print(pe + parampolicy + parampolicyx)
-    # print((parampolicyx + parampolicy))
-
-    exit(0)
-
-    print(p1 := Param('some_param'))
-    print(v1 := Value('some value'))
-    print(t1 := Target('some target', url='https://localhost'))
-    print(vs1 := Values([v1, Value('other')]))
-    # noinspection PyTypeChecker
-    print(vany := Values('values:AllValues'))
-    # noinspection PyTypeChecker
-    print(vnov := Values())
-    print(vany2 := Values.load('id:policies.test.values_1628881815'))
-    print(v1 in vany, v1 in vnov)
-
-    print(valuesx := Values(['val1', 'val2', 'val0'], id='id:policies.test.valuesx'))
-    print('val1' in valuesx)
-    print(Value('val0') in valuesx)
-    print('check', valuex_str := valuesx.dumps())
-    print(valuesx2 := Values.loads(valuex_str))
-    print(valuesx + Values(['val2', 'val3']))
-    print(valuesx % Values(['val2', 'val3']))
-    print(valuesx - Values(['val2', 'val3']))
-    valuesx.dump()
-
-    print(parampolicyx := ParamPolicy(target=Target('some target'), param=('some param'),
-                                      allowed='id:policies.test.valuesx',
-                                      id='id:policies.test.parampolicyx'
-                                      ))
-    print(parampolicyx)
-    parampolicyx.dump()
-    parampolicyx2 = ParamPolicy.load(identifier='id:policies.test.parampolicyx')
-    print(parampolicyx + parampolicyx2)
-    attr.evolve(parampolicyx + parampolicyx2, id='id:policies.test.parampolicy_1628889123').dump()
-
-    print(bool(px := ParamPolicy(target=Target('some target'), param=('some param'),
-                                 allowed='id:policies.test.valuesx',
-                                 denied=Values('values:AllValues'),
-                                 id='id:policies.test.px'
-                                 )))
-    px.dump()
+    param1 = Param.load('id:policies.test.param_param1')
+    param1.dump()
+    print(param1)
+    print(repo.list)
