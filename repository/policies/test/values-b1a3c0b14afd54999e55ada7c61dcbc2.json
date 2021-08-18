@@ -1,0 +1,6 @@
+{
+    "id": "id:policies.test.values-b1a3c0b14afd54999e55ada7c61dcbc2",
+    "type": "Values",
+    "doc": "doc for denied values param1policy (+) doc for values",
+    "values": []
+}

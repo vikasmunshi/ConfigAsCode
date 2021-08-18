@@ -1,0 +1,6 @@
+{
+    "id": "id:policies.test.value-fb75d1809550506bbbb199272ba7f119",
+    "type": "Value",
+    "doc": "doc for value",
+    "value": "value1"
+}
