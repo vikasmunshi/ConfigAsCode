@@ -1,0 +1,6 @@
+{
+    "id": "id:compiled.policies.test.value_value2",
+    "type": "Value",
+    "doc": "doc for value",
+    "value": "value2"
+}

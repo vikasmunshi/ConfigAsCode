@@ -1,0 +1,19 @@
+{
+    "id": "id:compiled.policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
+    "type": "Values",
+    "doc": "doc for values",
+    "values": [
+        {
+            "id": "id:policies.test.value_value1",
+            "type": "Value",
+            "doc": "doc for value",
+            "value": "value1"
+        },
+        {
+            "id": "id:policies.test.value_value2",
+            "type": "Value",
+            "doc": "doc for value",
+            "value": "value2"
+        }
+    ]
+}

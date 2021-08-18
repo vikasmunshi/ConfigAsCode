@@ -1,0 +1,43 @@
+{
+    "id": "id:compiled.policies.test.parampolicy_94c60347e4905426805ff826ca2ffa2c",
+    "type": "ParamPolicy",
+    "doc": "doc for param1 policy1  (+) doc for param1 policy1 ",
+    "target": {
+        "id": "id:policies.test.target_target1",
+        "type": "Target",
+        "doc": "doc for target",
+        "name": "target1",
+        "url": null
+    },
+    "param": {
+        "id": "id:policies.test.param_param1",
+        "type": "Param",
+        "doc": "doc for param",
+        "name": "param1"
+    },
+    "allowed": {
+        "id": "id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
+        "type": "Values",
+        "doc": "doc for values (-) doc for denied values param1policy (+) doc for values",
+        "values": [
+            {
+                "id": "id:policies.test.value_value1",
+                "type": "Value",
+                "doc": "doc for value",
+                "value": "value1"
+            },
+            {
+                "id": "id:policies.test.value_value2",
+                "type": "Value",
+                "doc": "doc for value",
+                "value": "value2"
+            }
+        ]
+    },
+    "denied": {
+        "id": "id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087",
+        "type": "Values",
+        "doc": "doc for denied values param1policy (+) doc for values",
+        "values": []
+    }
+}
