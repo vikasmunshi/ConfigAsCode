@@ -1,0 +1,5 @@
+{
+    "id": "id:policies.test.paramspolicies_paramspol1",
+    "type": "ParamsPolicies",
+    "expression": "expression: id:NullParamsPolicies + id:policies.test.parampolicy_param1policy + id:policies.test.parampolicy_param1policy2 + id:policies.test.parampolicy_param1policy3"
+}

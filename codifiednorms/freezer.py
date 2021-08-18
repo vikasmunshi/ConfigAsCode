@@ -77,11 +77,14 @@ def enforce_strict_types(callable):
 
 class FrozenDict(dict):
     def __init__(self, d: typing.Dict[str, typing.Union[str, typing.Iterable[str], object]]):
-        super(FrozenDict, self).__init__({
-            k: tuple(v) if isinstance(v, list) else FrozenDict(v) if isinstance(v, dict) else v
-            for k, v in (
-                d if isinstance(d, types.GeneratorType) else d.items() if isinstance(d, dict) else dict(d).items())
-        })
+        if isinstance(d, FrozenDict):
+            super(FrozenDict, self).__init__(d)
+        else:
+            super(FrozenDict, self).__init__({
+                k: tuple(v) if isinstance(v, list) else FrozenDict(v) if isinstance(v, dict) else v
+                for k, v in (
+                    d if isinstance(d, types.GeneratorType) else d.items() if isinstance(d, dict) else dict(d).items())
+            })
 
     def clear(self) -> None:
         return NotImplemented('FrozenDict Object is Immutable')

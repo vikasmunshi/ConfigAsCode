@@ -1,7 +1,7 @@
 {
     "id": "id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
     "type": "Values",
-    "doc": "doc for id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
+    "doc": "doc for values",
     "values": [
         {
             "id": "id:policies.test.value_value1",

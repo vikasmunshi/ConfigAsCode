@@ -18,13 +18,26 @@
     "allowed": {
         "id": "id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
         "type": "Values",
-        "doc": "doc for id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3 (-) doc for id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087 (+) doc for id:NoVals",
-        "values": "id:policies.test.value_value1"
+        "doc": "doc for id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
+        "values": [
+            {
+                "id": "id:policies.test.value_value1",
+                "type": "Value",
+                "doc": "doc for id:policies.test.value_value1",
+                "value": "value1"
+            },
+            {
+                "id": "id:policies.test.value_value2",
+                "type": "Value",
+                "doc": "doc for id:policies.test.value_value2",
+                "value": "value2"
+            }
+        ]
     },
     "denied": {
-        "id": "id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087",
+        "id": "id:NoVals",
         "type": "Values",
-        "doc": "doc for id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087 (+) doc for id:NoVals",
+        "doc": "doc for id:NoVals",
         "values": []
     }
 }

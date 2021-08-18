@@ -291,9 +291,9 @@ class ParamPolicy(Serializable):
             allowed = (self.allowed % other.allowed) - denied
             doc = f'{self.doc} (+) {other.doc}'
             return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
-        return ParamsPolicies(policy=FrozenDict({self.id: self, other.id: other}))
+        return attr.evolve(NullParamsPolicies, policy=FrozenDict({self.id: self, other.id: other}), id='', doc='')
 
-    def __sub__(self, other: ParamPolicy) -> typing.Union[ParamPolicy, ParamsPolicies]:
+    def __sub__(self, other: ParamPolicy) -> ParamPolicy:
         if self.target == other.target and self.param == other.param:
             allowed = self.allowed + other.allowed
             denied = self.denied - other.allowed
@@ -317,7 +317,7 @@ class ParamsPolicies(Serializable):
                        validator=attr.validators.deep_iterable(is_instance_of(ParamPolicy),
                                                                is_instance_of((str, ParamPolicy))))
     expression = attr.ib(type=str, default='', validator=is_instance_of(str))
-    policy = attr.ib(type=FrozenDict[str, ParamPolicy], converter=FrozenDict)
+    policy = attr.ib(type=FrozenDict[str, ParamPolicy])
 
     @policy.default
     def policy_default(self):
@@ -380,10 +380,8 @@ if __name__ == '__main__':
     param1policy3 = param1policy + param1policy2
     attr.evolve(param1policy3, id='id:policies.test.parampolicy_param1policy3').dump()
 
-    paramspol1 = ParamsPolicies(expression=f'expression: id:NullParamsPolicies + '
-                                           f'id:policies.test.parampolicy_param1policy +'
-                                           f'id:policies.test.parampolicy_param1policy2 +'
-                                           f'id:policies.test.parampolicy_param1policy3')
+    paramspol1 = ParamsPolicies.load(identifier='id:policies.test.paramspolicies_paramspol1')
+
 
     print(repo.list)
     for pid, p in tuple(repo.repo_cache.items()):
