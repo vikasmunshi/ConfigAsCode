@@ -1,0 +1,12 @@
+{
+  "id": "id:policies.test.parampolicy_param1policy2",
+  "type": "ParamPolicy",
+  "doc": "doc for param1 policy1 ",
+  "target": "id:policies.test.target_target1",
+  "param": "id:policies.test.param_param1",
+  "allowed": [
+    "id:policies.test.value_value1",
+    "id:policies.test.value_value2"
+  ],
+  "denied": "value:NoVals"
+}

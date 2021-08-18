@@ -11,10 +11,15 @@ import json
 import os
 import pathlib
 import re
-import time
 import typing
+import uuid
 
 import attr
+
+try:
+    from .freezer import FrozenDict
+except ImportError:
+    from freezer import FrozenDict
 
 T = typing.TypeVar('T', bound='Base')
 is_instance_of = attr.validators.instance_of
@@ -43,12 +48,12 @@ class Repo:
     def is_valid_id(self, identifier: str) -> bool:
         if not identifier.startswith('id:'):
             return False
-        if not self.root in self.path(identifier).parents:
+        if self.root not in self.path(identifier).parents:
             return False
         return True
 
     def new(self, name: str) -> str:
-        path = pathlib.Path(os.getcwd()).relative_to(self.root).joinpath(f'{name}_{str(time.time())}')
+        path = pathlib.Path(os.getcwd()).relative_to(self.root).joinpath(f'{name}')
         path = str(path).replace('/', '.').replace('\\', '.')
         return f'id:{path}'
 
@@ -83,32 +88,36 @@ repo = Repo()
 
 
 class Specials(str):
-    pass
+    def __eq__(self, other: typing.Union[Specials, str]) -> bool:
+        if isinstance(other, (Specials, Value, str)):
+            r = ((False, False, False),
+                 (False, None, True),
+                 (False, True, True))[
+                0 if int(self is NoValue) else 2 if int(self is AnyValue) else 1][
+                0 if int(other is NoValue) else 2 if int(other is AnyValue) else 1]
+            if r is not None:
+                return r
+        return super(Specials, self).__eq__(other)
 
-
-AllValues = Specials('values:AllValues')
 id_re = re.compile(r'id:[^\s)(=/*-+]*')
-values_re = re.compile(r'values:[^\s)(=/*-+]*')
+value_re = re.compile(r'value:[^\s)(=/*-+]*')
 escape_colon_dot: typing.Callable[[str], str] = lambda key: key.replace(':', '_').replace('.', '_')
 
 
 @attr.s(frozen=True, kw_only=True)
 class Serializable:
-    id = attr.ib(type=str, validator=is_instance_of(str))
+    id = attr.ib(type=str, validator=is_instance_of(str), eq=False, default='')
     type = attr.ib(type=str, eq=False, init=False)
-    doc = attr.ib(type=str, eq=False, validator=is_instance_of(str))
+    doc = attr.ib(type=str, eq=False, validator=is_instance_of(str), repr=False)
 
     def __attrs_post_init__(self):
+        if self.id == '':
+            file_path = repo.new(name=self.__class__.__name__.lower())
+            content = attr.asdict(self, filter=lambda attr, value: (attr.repr and attr.name != 'id'))
+            object.__setattr__(self, 'id', f'{file_path}-{uuid.uuid5(uuid.NAMESPACE_URL, str(content)).hex}')
+        if not repo.is_valid_id(self.id):
+            raise ValueError(f'{self.id} id not a valid id')
         repo.put(obj=self)
-
-    @id.default
-    def id_default(self) -> str:
-        return repo.new(name=self.__class__.__name__.lower())
-
-    @id.validator
-    def id_validator(self, attribute, value):
-        if not repo.is_valid_id(identifier=value):
-            raise ValueError(f'{value} id not a valid {attribute.name}')
 
     @type.default
     def type_default(self) -> str:
@@ -129,7 +138,6 @@ class Serializable:
         try:
             obj = cls.loads(repo.read(identifier))
             if obj.id != identifier:
-                obj = attr.evolve(obj, id=identifier)
                 obj.dump()
             return obj
         except (json.JSONDecodeError, TypeError) as e:
@@ -145,14 +153,16 @@ class Serializable:
             -> typing.Optional[typing.Union[T, typing.Tuple[T]]]:
         if isinstance(data, cls):
             return data
+        if isinstance(data, Specials):
+            return globals()[data.split(":", 1)[1]]
         if isinstance(data, str):
             if data.startswith('id:'):
                 return repo.get(data) or cls.load(data)
-            if data.startswith('values:'):
-                return globals()[data.split(':', 1)[1]]
+            if data.startswith('value:'):
+                return globals()[data.split(":", 1)[1]]
             if data.startswith('expression:'):
                 exp_str = data.split(':', 1)[1]
-                value_s = {escape_colon_dot(k): globals()[k.split(':', 1)[1]] for k in set(values_re.findall(exp_str))}
+                value_s = {escape_colon_dot(k): globals()[k.split(':', 1)[1]] for k in set(value_re.findall(exp_str))}
                 id_s = {escape_colon_dot(k): (repo.get(k) or cls.load(k)) for k in set(id_re.findall(exp_str))}
                 return eval(escape_colon_dot(exp_str), globals(), dict(id_s, **value_s))
             # noinspection PyArgumentList
@@ -161,9 +171,19 @@ class Serializable:
             # noinspection PyArgumentList
             return cls(data)
         if isinstance(data, (list, tuple, set)):
+            if hasattr(cls, '__iter__'):
+                # noinspection PyArgumentList
+                return cls(data)
             return tuple(cls.cast(d) for d in data)
         if isinstance(data, dict):
             return cls(**data)
+
+    @property
+    def with_proper_id(self: typing.Type[T]) -> T:
+        return attr.evolve(self, id='')
+
+    def compile(self):
+        pass
 
 
 @attr.s(frozen=True)
@@ -209,7 +229,7 @@ class Values(Serializable):
 
     def __contains__(self, item: typing.Union[Value, bool, int, str]) -> bool:
         if self.values is AllValues:
-            return True
+            return item == AllValues
         return item.value in self.values if isinstance(item, Value) else item in self.values
 
     def __iter__(self) -> typing.Generator[typing.Union[bool, int, str], None, None]:
@@ -228,7 +248,7 @@ class Values(Serializable):
     def __sub__(self, other: Values) -> typing.Union[Values, Specials]:
         """ remove values from self that are also in other"""
         if self.values is AllValues:
-            values = self.values
+            values = self
         elif other.values is AllValues:
             values = tuple()
         else:
@@ -238,13 +258,15 @@ class Values(Serializable):
     def __mod__(self, other: Values) -> typing.Union[Values, Specials]:
         """ return values that are in both i.e. intersection of sets"""
         if self.values is AllValues:
-            return other.values
+            return other
         if other.values is AllValues:
-            return self.values
+            return self
         values = tuple(v for v in self.values if v in other.values)
         return Values(values=values, doc=f'{self.doc} (%) {other.doc}')
 
-
+AnyValue = Specials('value:AnyValue')
+NoValue = Specials('value:NoValue')
+AllValues = Specials('value:AllValues')
 AllVals = Values(AllValues, id='id:AllVals')
 NoVals = Values(id='id:NoVals')
 
@@ -262,7 +284,7 @@ class ParamPolicy(Serializable):
             allowed = (self.allowed % other.allowed) - denied
             doc = f'{self.doc} (+) {other.doc}'
             return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
-        return ParamsPolicies(policy={self.id: self, other.id: other})
+        return ParamsPolicies(policy=FrozenDict({self.id: self, other.id: other}))
 
     def __sub__(self, other: ParamPolicy) -> typing.Union[ParamPolicy, ParamsPolicies]:
         if self.target == other.target and self.param == other.param:
@@ -270,10 +292,7 @@ class ParamPolicy(Serializable):
             denied = self.denied - other.allowed
             doc = f'{self.doc} (-) {other.doc}'
             return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
-        return ParamsPolicies(policy={self.id: self, other.id: - other})
-
-    def __neg__(self) -> ParamPolicy:
-        return attr.evolve(self, denied=NoVals, doc=f'(-) {self.doc}')
+        return self
 
     def __bool__(self: ParamPolicy) -> bool:
         if self.denied is AllValues:
@@ -291,7 +310,7 @@ class ParamsPolicies(Serializable):
                        validator=attr.validators.deep_iterable(is_instance_of(ParamPolicy),
                                                                is_instance_of((str, ParamPolicy))))
     expression = attr.ib(type=str, default='', validator=is_instance_of(str))
-    policy = attr.ib(type=dict[str, ParamPolicy])
+    policy = attr.ib(type=FrozenDict[str, ParamPolicy], converter=FrozenDict)
 
     @policy.default
     def policy_default(self):
@@ -299,7 +318,7 @@ class ParamsPolicies(Serializable):
             return ParamPolicy.cast(self.expression)
         if self.policies:
             return functools.reduce(lambda x, y: x + y, (ParamPolicy.cast(p) for p in self.policies))
-        return {}
+        return FrozenDict({})
 
     @functools.cached_property
     def policy_map(self) -> dict[str, dict[str, str]]:
@@ -308,33 +327,32 @@ class ParamsPolicies(Serializable):
             if p.target.id not in policy_map:
                 policy_map[p.target.id] = {}
             policy_map[p.target.id][p.param.id] = pid
-        return policy_map
+        return FrozenDict(policy_map)
 
     def __add__(self, other: typing.Union[ParamsPolicies, ParamPolicy]) -> ParamsPolicies:
         if isinstance(other, ParamPolicy):
-            if other.target.id not in self.policy_map or other.param.id not in self.policy_map[other.target.id]:
-                policy = dict(self.policy, **{other.id: other})
-                doc = f'{self.doc} (+) {other.doc}'
-                return ParamsPolicies(policy=policy, doc=doc)
-            else:
-                param_policy = self.policy.pop(self.policy_map[other.target.id][other.param.id]) + other
-                policy = dict(self.policy, **{param_policy.id: param_policy})
-                doc = f'{self.doc} (+) {param_policy.doc}'
-                return ParamsPolicies(policy=policy, doc=doc)
-        return functools.reduce(lambda a, b: a + b, other.policy.values(), self)
+            if other.target.id in self.policy_map:
+                if other.param.id in self.policy_map[other.target.id]:
+                    pid = self.policy_map[other.target.id][other.param.id]
+                    param_policy = self.policy[pid] + other
+                    policy = FrozenDict({param_policy.id: param_policy,
+                                         **{k: v for k, v in self.policy.items() if k != pid}})
+                    return attr.evolve(self, policy=policy)
+            policy = FrozenDict(dict(self.policy, **{other.id: other}))
+            return attr.evolve(self, policy=policy)
+        return functools.reduce(lambda p, q: p + q, other.policy.values(), self)
 
     def __sub__(self, other: typing.Union[ParamsPolicies, ParamPolicy]) -> ParamsPolicies:
         if isinstance(other, ParamPolicy):
-            if other.target.id not in self.policy_map or other.param.id not in self.policy_map[other.target.id]:
-                policy = dict(self.policy, **{other.id: - other})
-                doc = f'{self.doc} (-) {other.doc}'
-                return ParamsPolicies(policy=policy, doc=doc)
-            else:
-                param_policy = self.policy.pop(self.policy_map[other.target.id][other.param.id]) - other
-                policy = dict(self.policy, **{param_policy.id: param_policy})
-                doc = f'{self.doc} (-) {param_policy.doc}'
-                return ParamsPolicies(policy=policy, doc=doc)
-        return functools.reduce(lambda a, b: a + b, other.policy.values(), self)
+            if other.target.id in self.policy_map:
+                if other.param.id in self.policy_map[other.target.id]:
+                    pid = self.policy_map[other.target.id][other.param.id]
+                    param_policy = self.policy[pid] - other
+                    policy = FrozenDict({param_policy.id: param_policy,
+                                         **{k: v for k, v in self.policy.items() if k != pid}})
+                    return attr.evolve(self, policy=policy)
+            return self
+        return functools.reduce(lambda p, q: p - q, other.policy.values(), self)
 
 
 if __name__ == '__main__':
@@ -342,5 +360,16 @@ if __name__ == '__main__':
     # param1.dump()
     target1 = Target.load(identifier='id:policies.test.target_target1')
     # target1.dump()
-    print(param1, target1)
-    print(repo.list)
+    value1 = Value.load(identifier='id:policies.test.value_value1')
+    # value1.dump()
+    value2 = Value.load(identifier='id:policies.test.value_value2')
+    # value2.dump()
+    values1 = Values.load(identifier='id:policies.test.values_values1')
+    values2 = repo.get('id:AllVals')
+    param1policy = ParamPolicy.load(identifier='id:policies.test.parampolicy_param1policy')
+    param1policy2 = ParamPolicy.load(identifier='id:policies.test.parampolicy_param1policy2')
+    param1policy3 = param1policy + param1policy2
+    attr.evolve(param1policy3, id='id:policies.test.parampolicy_param1policy3').dump()
+
+    for pid, p in tuple(repo.repo_cache.items()):
+        p.with_proper_id.dump()
