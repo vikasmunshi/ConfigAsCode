@@ -10,7 +10,9 @@ import functools
 import json
 import os
 import pathlib
+import random
 import re
+import string
 import typing
 import uuid
 
@@ -44,6 +46,9 @@ class Repo:
     def path(self, identifier: str) -> pathlib.Path:
         identifier = identifier.split(':', 1)[1]
         return self.root.joinpath(identifier.replace('.', '/')).with_suffix('.json')
+
+    def identifier(self, path: pathlib.Path) -> str:
+        return 'id:' + str(path.relative_to(self.root)).replace('/', '.').replace('\\', '.')
 
     def is_valid_id(self, identifier: str) -> bool:
         if not identifier.startswith('id:'):
@@ -99,6 +104,10 @@ class Specials(str):
                 return r
         return super(Specials, self).__eq__(other)
 
+
+AnyValue = Specials('value:AnyValue')
+NoValue = Specials('value:NoValue')
+AllValues = Specials('value:AllValues')
 id_re = re.compile(r'id:[^\s)(=/*-+]*')
 value_re = re.compile(r'value:[^\s)(=/*-+]*')
 escape_colon_dot: typing.Callable[[str], str] = lambda key: key.replace(':', '_').replace('.', '_')
@@ -112,11 +121,12 @@ class Serializable:
 
     def __attrs_post_init__(self):
         if self.id == '':
-            file_path = repo.new(name=self.__class__.__name__.lower())
-            content = attr.asdict(self, filter=lambda attr, value: (attr.repr and attr.name != 'id'))
-            object.__setattr__(self, 'id', f'{file_path}-{uuid.uuid5(uuid.NAMESPACE_URL, str(content)).hex}')
-        if not repo.is_valid_id(self.id):
-            raise ValueError(f'{self.id} id not a valid id')
+            obj_name = self.name if hasattr(self, 'name') \
+                else self.value if hasattr(self, 'value') \
+                else uuid.uuid5(uuid.NAMESPACE_URL,
+                                str(attr.asdict(self, filter=lambda attr, value: (attr.repr and attr.eq)))).hex
+            file_name = f'{self.__class__.__name__.lower()}_{obj_name}'
+            object.__setattr__(self, 'id', repo.new(file_name))
         repo.put(obj=self)
 
     @type.default
@@ -136,10 +146,7 @@ class Serializable:
     @classmethod
     def load(cls: typing.Type[T], identifier: str) -> T:
         try:
-            obj = cls.loads(repo.read(identifier))
-            if obj.id != identifier:
-                obj.dump()
-            return obj
+            return cls.loads(repo.read(identifier))
         except (json.JSONDecodeError, TypeError) as e:
             print(f'{type(e).__name__} while loading {identifier} from file')
             raise
@@ -178,12 +185,15 @@ class Serializable:
         if isinstance(data, dict):
             return cls(**data)
 
-    @property
-    def with_proper_id(self: typing.Type[T]) -> T:
-        return attr.evolve(self, id='')
-
-    def compile(self):
-        pass
+    def compile(self) -> str:
+        file_path = repo.path(self.id)
+        file_name = file_path.stem
+        out_folder = repo.root.joinpath('compiled')
+        file_path = out_folder.joinpath(file_path.parent.relative_to(repo.root), file_name)
+        file_path.parent.mkdir(parents=True, exist_ok=True)
+        obj = attr.evolve(self, id=repo.identifier(file_path))
+        obj.dump()
+        return obj.id
 
 
 @attr.s(frozen=True)
@@ -264,9 +274,7 @@ class Values(Serializable):
         values = tuple(v for v in self.values if v in other.values)
         return Values(values=values, doc=f'{self.doc} (%) {other.doc}')
 
-AnyValue = Specials('value:AnyValue')
-NoValue = Specials('value:NoValue')
-AllValues = Specials('value:AllValues')
+
 AllVals = Values(AllValues, id='id:AllVals')
 NoVals = Values(id='id:NoVals')
 
@@ -371,5 +379,6 @@ if __name__ == '__main__':
     param1policy3 = param1policy + param1policy2
     attr.evolve(param1policy3, id='id:policies.test.parampolicy_param1policy3').dump()
 
+    print(repo.list)
     for pid, p in tuple(repo.repo_cache.items()):
-        p.with_proper_id.dump()
+        p.compile()

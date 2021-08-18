@@ -16,7 +16,7 @@
         "name": "param1"
     },
     "allowed": {
-        "id": "id:policies.test.values-ec14127e97a35d34b2773d5a8e8fd715",
+        "id": "id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
         "type": "Values",
         "doc": "doc for values (-) doc for denied values param1policy (+) doc for values",
         "values": [
@@ -35,7 +35,7 @@
         ]
     },
     "denied": {
-        "id": "id:policies.test.values-b1a3c0b14afd54999e55ada7c61dcbc2",
+        "id": "id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087",
         "type": "Values",
         "doc": "doc for denied values param1policy (+) doc for values",
         "values": []
