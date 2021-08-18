@@ -115,27 +115,23 @@ escape_colon_dot: typing.Callable[[str], str] = lambda key: key.replace(':', '_'
 
 @attr.s(frozen=True, kw_only=True)
 class Serializable:
-    id = attr.ib(type=str, validator=is_instance_of(str), eq=False, default='')
+    id = attr.ib(type=str, eq=False, default='', validator=is_instance_of(str))
     type = attr.ib(type=str, eq=False, init=False)
-    doc = attr.ib(type=str, eq=False, validator=is_instance_of(str), repr=False)
+    doc = attr.ib(type=str, eq=False, default='', validator=is_instance_of(str))
 
     def __attrs_post_init__(self):
         if self.id == '':
             obj_name = self.name if hasattr(self, 'name') \
                 else self.value if hasattr(self, 'value') \
-                else uuid.uuid5(uuid.NAMESPACE_URL,
-                                str(attr.asdict(self, filter=lambda attr, value: (attr.repr and attr.eq)))).hex
-            file_name = f'{self.__class__.__name__.lower()}_{obj_name}'
-            object.__setattr__(self, 'id', repo.new(file_name))
+                else uuid.uuid5(uuid.NAMESPACE_URL, str(attr.asdict(self, filter=lambda a, v: a.eq))).hex
+            object.__setattr__(self, 'id', repo.new(f'{self.__class__.__name__.lower()}_{obj_name}'))
+        if self.doc == '':
+            object.__setattr__(self, 'doc', f'doc for {self.id}')
         repo.put(obj=self)
 
     @type.default
     def type_default(self) -> str:
         return self.__class__.__name__
-
-    @doc.default
-    def doc_default(self) -> str:
-        return f'doc for {self.__class__.__name__.lower()}'
 
     def dump(self):
         repo.write(self.id, self.dumps())
@@ -144,9 +140,12 @@ class Serializable:
         return json.dumps(obj=attr.asdict(self), indent=4)
 
     @classmethod
-    def load(cls: typing.Type[T], identifier: str) -> T:
+    def load(cls: typing.Type[T], identifier: str, clean: bool = False) -> T:
         try:
-            return cls.loads(repo.read(identifier))
+            obj = cls.loads(repo.read(identifier))
+            if clean:
+                obj = attr.evolve(obj, id='', doc='')
+            return obj
         except (json.JSONDecodeError, TypeError) as e:
             print(f'{type(e).__name__} while loading {identifier} from file')
             raise
@@ -253,7 +252,7 @@ class Values(Serializable):
             values = AllValues
         else:
             values = self.values + tuple(v for v in other.values if v not in self.values)
-        return Values(values=values, doc=f'{self.doc} (+) {other.doc}')
+        return attr.evolve(self, values=values, doc=f'{self.doc} (+) {other.doc}', id='')
 
     def __sub__(self, other: Values) -> typing.Union[Values, Specials]:
         """ remove values from self that are also in other"""
@@ -263,7 +262,7 @@ class Values(Serializable):
             values = tuple()
         else:
             values = tuple(v for v in self.values if v not in other.values)
-        return Values(values=values, doc=f'{self.doc} (-) {other.doc}')
+        return attr.evolve(self, values=values, doc=f'{self.doc} (-) {other.doc}', id='')
 
     def __mod__(self, other: Values) -> typing.Union[Values, Specials]:
         """ return values that are in both i.e. intersection of sets"""
@@ -272,7 +271,7 @@ class Values(Serializable):
         if other.values is AllValues:
             return self
         values = tuple(v for v in self.values if v in other.values)
-        return Values(values=values, doc=f'{self.doc} (%) {other.doc}')
+        return attr.evolve(self, values=values, doc=f'{self.doc} (%) {other.doc}', id='')
 
 
 AllVals = Values(AllValues, id='id:AllVals')
@@ -314,7 +313,7 @@ class ParamPolicy(Serializable):
 
 @attr.s(frozen=True)
 class ParamsPolicies(Serializable):
-    policies = attr.ib(type=tuple[typing.Union[str, ParamPolicy], ...], factory=tuple,
+    policies = attr.ib(type=tuple[typing.Union[str, ParamPolicy], ...], default='',
                        validator=attr.validators.deep_iterable(is_instance_of(ParamPolicy),
                                                                is_instance_of((str, ParamPolicy))))
     expression = attr.ib(type=str, default='', validator=is_instance_of(str))
@@ -345,9 +344,9 @@ class ParamsPolicies(Serializable):
                     param_policy = self.policy[pid] + other
                     policy = FrozenDict({param_policy.id: param_policy,
                                          **{k: v for k, v in self.policy.items() if k != pid}})
-                    return attr.evolve(self, policy=policy)
+                    return attr.evolve(self, policy=policy, id='')
             policy = FrozenDict(dict(self.policy, **{other.id: other}))
-            return attr.evolve(self, policy=policy)
+            return attr.evolve(self, policy=policy, id='')
         return functools.reduce(lambda p, q: p + q, other.policy.values(), self)
 
     def __sub__(self, other: typing.Union[ParamsPolicies, ParamPolicy]) -> ParamsPolicies:
@@ -358,10 +357,12 @@ class ParamsPolicies(Serializable):
                     param_policy = self.policy[pid] - other
                     policy = FrozenDict({param_policy.id: param_policy,
                                          **{k: v for k, v in self.policy.items() if k != pid}})
-                    return attr.evolve(self, policy=policy)
+                    return attr.evolve(self, policy=policy, id='')
             return self
         return functools.reduce(lambda p, q: p - q, other.policy.values(), self)
 
+
+NullParamsPolicies = ParamsPolicies(id='id:NullParamsPolicies')
 
 if __name__ == '__main__':
     param1 = Param.load(identifier='id:policies.test.param_param1')
@@ -378,6 +379,11 @@ if __name__ == '__main__':
     param1policy2 = ParamPolicy.load(identifier='id:policies.test.parampolicy_param1policy2')
     param1policy3 = param1policy + param1policy2
     attr.evolve(param1policy3, id='id:policies.test.parampolicy_param1policy3').dump()
+
+    paramspol1 = ParamsPolicies(expression=f'expression: id:NullParamsPolicies + '
+                                           f'id:policies.test.parampolicy_param1policy +'
+                                           f'id:policies.test.parampolicy_param1policy2 +'
+                                           f'id:policies.test.parampolicy_param1policy3')
 
     print(repo.list)
     for pid, p in tuple(repo.repo_cache.items()):

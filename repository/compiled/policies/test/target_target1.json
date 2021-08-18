@@ -1,7 +1,7 @@
 {
     "id": "id:compiled.policies.test.target_target1",
     "type": "Target",
-    "doc": "doc for target",
+    "doc": "doc for id:policies.test.target_target1",
     "name": "target1",
     "url": null
 }

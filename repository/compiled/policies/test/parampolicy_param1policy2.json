@@ -18,7 +18,7 @@
     "allowed": {
         "id": "id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
         "type": "Values",
-        "doc": "doc for values",
+        "doc": "doc for id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
         "values": [
             {
                 "id": "id:policies.test.value_value1",
@@ -37,7 +37,7 @@
     "denied": {
         "id": "id:NoVals",
         "type": "Values",
-        "doc": "doc for values",
+        "doc": "doc for id:NoVals",
         "values": []
     }
 }

@@ -1,30 +1,20 @@
 {
-    "id": "id:policies.test.parampolicy_param1policy",
     "type": "ParamPolicy",
-    "doc": "doc for param1 policy1 ",
     "target": {
-        "id": "id:policies.test.target_target1",
         "type": "Target",
-        "doc": "doc for target",
         "name": "target1",
         "url": null
     },
     "param": {
-        "id": "id:policies.test.param_param1",
         "type": "Param",
-        "doc": "doc for param",
         "name": "param1"
     },
     "allowed": {
-        "id": "id:AllVals",
         "type": "Values",
-        "doc": "doc for allowed values param1policy",
         "values": "value:AllValues"
     },
     "denied": {
-        "id": "id:NoVals",
         "type": "Values",
-        "doc": "doc for denied values param1policy",
         "values": []
     }
 }

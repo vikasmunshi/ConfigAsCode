@@ -1,0 +1,30 @@
+{
+    "id": "id:compiled.policies.test.parampolicy_a1ae3939389b5ec8a8e372cd48d48e24",
+    "type": "ParamPolicy",
+    "doc": "doc for id:policies.test.parampolicy_a1ae3939389b5ec8a8e372cd48d48e24",
+    "target": {
+        "id": "id:policies.test.target_target1",
+        "type": "Target",
+        "doc": "doc for id:policies.test.target_target1",
+        "name": "target1",
+        "url": null
+    },
+    "param": {
+        "id": "id:policies.test.param_param1",
+        "type": "Param",
+        "doc": "doc for id:policies.test.param_param1",
+        "name": "param1"
+    },
+    "allowed": {
+        "id": "id:policies.test.values_9310f9a1e2e3536caab8fe5b40d56e87",
+        "type": "Values",
+        "doc": "doc for id:policies.test.values_9310f9a1e2e3536caab8fe5b40d56e87",
+        "values": "value:AllValues"
+    },
+    "denied": {
+        "id": "id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087",
+        "type": "Values",
+        "doc": "doc for id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087",
+        "values": []
+    }
+}
