@@ -347,7 +347,7 @@ class ParamsPolicies(Param):
         return functools.reduce(lambda p, q: p - q, other.policy.values(), self)
 
 
-NullParamsPolicies = ParamsPolicies(id='id:NullParamsPolicies', name='Param Policies')
+NullParamsPolicies = ParamsPolicies(id='id:NullParamsPolicies', name='Param Policies', target=Target(name=AnyValue))
 
 if __name__ == '__main__':
     param1 = Param.load(identifier='id:policies.test.param_param1')
@@ -364,8 +364,8 @@ if __name__ == '__main__':
     param1policy2 = ParamPolicy.load(identifier='id:policies.test.parampolicy_Param1Policy2')
     param1policy3 = param1policy + param1policy2
 
-    paramspol1 = ParamsPolicies.load(identifier='id:policies.test.paramspolicies_ParamPolicies1')
+    params_pol1 = ParamsPolicies.load(identifier='id:policies.test.paramspolicies_ParamPolicies1')
 
     print(repo.list)
-    for pid, p in tuple(repo.repo_cache.items()):
-        p.compile()
+    for pol_id, pol in tuple(repo.repo_cache.items()):
+        pol.compile()
