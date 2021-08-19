@@ -10,9 +10,7 @@ import functools
 import json
 import os
 import pathlib
-import random
 import re
-import string
 import typing
 import uuid
 
@@ -23,7 +21,7 @@ try:
 except ImportError:
     from freezer import FrozenDict
 
-T = typing.TypeVar('T', bound='Base')
+T = typing.TypeVar('T', bound='Serializable')
 is_instance_of = attr.validators.instance_of
 
 
@@ -63,15 +61,8 @@ class Repo:
         return f'id:{path}'
 
     def read(self, identifier: str) -> str:
-        try:
-            with open(self.path(identifier), 'r') as in_file:
-                return in_file.read()
-        except FileNotFoundError:
-            print(f'file {self.path(identifier)} does not exist')
-            raise
-        except IOError:
-            print(f'file {self.path(identifier)} cannot be read')
-            raise
+        with open(self.path(identifier), 'r') as in_file:
+            return in_file.read()
 
     def write(self, identifier: str, s: str):
         with open(self.path(identifier), 'w') as out_file:
@@ -94,14 +85,13 @@ repo = Repo()
 
 class Specials(str):
     def __eq__(self, other: typing.Union[Specials, str]) -> bool:
-        if isinstance(other, (Specials, Value, str)):
-            r = ((False, False, False),
-                 (False, None, True),
-                 (False, True, True))[
-                0 if int(self is NoValue) else 2 if int(self is AnyValue) else 1][
-                0 if int(other is NoValue) else 2 if int(other is AnyValue) else 1]
-            if r is not None:
-                return r
+        r = ((False, False, False),
+             (False, None, True),
+             (False, True, True))[
+            0 if int(self is NoValue) else 2 if int(self is AnyValue or self is AllValues) else 1][
+            0 if int(other is NoValue) else 2 if int(other is AnyValue or other is AllValues) else 1]
+        if r is not None:
+            return r
         return super(Specials, self).__eq__(other)
 
 
@@ -120,13 +110,13 @@ class Serializable:
     doc = attr.ib(type=str, eq=False, default='', validator=is_instance_of(str))
 
     def __attrs_post_init__(self):
+        obj_name = self.name if hasattr(self, 'name') \
+            else self.value if hasattr(self, 'value') \
+            else uuid.uuid5(uuid.NAMESPACE_URL, str(attr.asdict(self, filter=lambda a, v: a.eq))).hex
         if self.id == '':
-            obj_name = self.name if hasattr(self, 'name') \
-                else self.value if hasattr(self, 'value') \
-                else uuid.uuid5(uuid.NAMESPACE_URL, str(attr.asdict(self, filter=lambda a, v: a.eq))).hex
             object.__setattr__(self, 'id', repo.new(f'{self.__class__.__name__.lower()}_{obj_name}'))
         if self.doc == '':
-            object.__setattr__(self, 'doc', f'doc for {self.id}')
+            object.__setattr__(self, 'doc', f'doc for {obj_name}')
         repo.put(obj=self)
 
     @type.default
@@ -140,15 +130,8 @@ class Serializable:
         return json.dumps(obj=attr.asdict(self), indent=4)
 
     @classmethod
-    def load(cls: typing.Type[T], identifier: str, clean: bool = False) -> T:
-        try:
-            obj = cls.loads(repo.read(identifier))
-            if clean:
-                obj = attr.evolve(obj, id='', doc='')
-            return obj
-        except (json.JSONDecodeError, TypeError) as e:
-            print(f'{type(e).__name__} while loading {identifier} from file')
-            raise
+    def load(cls: typing.Type[T], identifier: str) -> T:
+        return cls.loads(repo.read(identifier))
 
     @classmethod
     def loads(cls: typing.Type[T], data: str) -> T:
@@ -156,11 +139,9 @@ class Serializable:
 
     @classmethod
     def cast(cls: typing.Type[T], data: typing.Union[T, typing.Iterable, bool, int, str]) \
-            -> typing.Optional[typing.Union[T, typing.Tuple[T]]]:
+            -> typing.Optional[typing.Union[T, typing.Tuple[T, ...]]]:
         if isinstance(data, cls):
             return data
-        if isinstance(data, Specials):
-            return globals()[data.split(":", 1)[1]]
         if isinstance(data, str):
             if data.startswith('id:'):
                 return repo.get(data) or cls.load(data)
@@ -179,20 +160,18 @@ class Serializable:
         if isinstance(data, (list, tuple, set)):
             if hasattr(cls, '__iter__'):
                 # noinspection PyArgumentList
-                return cls(data)
+                return cls(tuple(data))
             return tuple(cls.cast(d) for d in data)
         if isinstance(data, dict):
             return cls(**data)
 
-    def compile(self) -> str:
-        file_path = repo.path(self.id)
-        file_name = file_path.stem
+    def compile(self: T) -> T:
         out_folder = repo.root.joinpath('compiled')
-        file_path = out_folder.joinpath(file_path.parent.relative_to(repo.root), file_name)
+        file_path = out_folder.joinpath((fp := repo.path(self.id)).parent.relative_to(repo.root), fp.stem)
         file_path.parent.mkdir(parents=True, exist_ok=True)
         obj = attr.evolve(self, id=repo.identifier(file_path))
         obj.dump()
-        return obj.id
+        return obj
 
 
 @attr.s(frozen=True)
@@ -236,13 +215,13 @@ class Values(Serializable):
     def __bool__(self) -> bool:
         return bool(self.values)
 
-    def __contains__(self, item: typing.Union[Value, bool, int, str]) -> bool:
+    def __contains__(self, item: Value) -> bool:
         if self.values is AllValues:
-            return item == AllValues
-        return item.value in self.values if isinstance(item, Value) else item in self.values
+            return item.value == AllValues
+        return item.value in self.values
 
-    def __iter__(self) -> typing.Generator[typing.Union[bool, int, str], None, None]:
-        if isinstance(self.values, Specials):
+    def __iter__(self) -> typing.Generator[Value, None, None]:
+        if self.values is AllValues:
             yield from tuple()
         yield from self.values
 
@@ -279,11 +258,12 @@ NoVals = Values(id='id:NoVals')
 
 
 @attr.s(frozen=True)
-class ParamPolicy(Serializable):
+class ParamPolicy(Param):
     target = attr.ib(type=Target, converter=Target.cast, validator=is_instance_of(Target))
     param = attr.ib(type=Param, converter=Param.cast, validator=is_instance_of(Param))
     allowed = attr.ib(type=Values, converter=Values.cast, default=AllVals, validator=is_instance_of(Values))
     denied = attr.ib(type=Values, converter=Values.cast, default=NoVals, validator=is_instance_of(Values))
+    implementation = attr.ib(type=str, eq=False, repr=False, default='as_dict', validator=is_instance_of(str))
 
     def __add__(self: ParamPolicy, other: ParamPolicy) -> typing.Union[ParamPolicy, ParamsPolicies]:
         if self.target == other.target and self.param == other.param:
@@ -306,13 +286,21 @@ class ParamPolicy(Serializable):
             return False
         return bool(self.allowed - self.denied)
 
-    def __matmul__(self: ParamPolicy, value: typing.Union[bool, int, str]) -> bool:
+    def __matmul__(self: ParamPolicy, value: Value) -> bool:
         """ Policy @ Value"""
         return value in self.allowed and value not in self.denied
 
+    def get_implementation(self, value: Value) -> dict[str, typing.Optional[str]]:
+        as_dict: typing.Callable[[Param, Value], dict[str, str]] = lambda param, value: {param.name: value.value}
+        if self @ value:
+            func = globals().get(self.implementation, as_dict)
+            # noinspection PyArgumentList
+            return func(param=self.param, value=value)
+        return {self.param.name: None}
+
 
 @attr.s(frozen=True)
-class ParamsPolicies(Serializable):
+class ParamsPolicies(Param):
     policies = attr.ib(type=tuple[typing.Union[str, ParamPolicy], ...], default='',
                        validator=attr.validators.deep_iterable(is_instance_of(ParamPolicy),
                                                                is_instance_of((str, ParamPolicy))))
@@ -381,7 +369,7 @@ if __name__ == '__main__':
     attr.evolve(param1policy3, id='id:policies.test.parampolicy_param1policy3').dump()
 
     paramspol1 = ParamsPolicies.load(identifier='id:policies.test.paramspolicies_paramspol1')
-
+    print(param1policy.get_implementation(value1))
 
     print(repo.list)
     for pid, p in tuple(repo.repo_cache.items()):

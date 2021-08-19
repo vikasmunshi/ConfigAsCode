@@ -1,7 +1,7 @@
 {
     "id": "id:compiled.policies.test.parampolicy_94c60347e4905426805ff826ca2ffa2c",
     "type": "ParamPolicy",
-    "doc": "doc for id:policies.test.parampolicy_94c60347e4905426805ff826ca2ffa2c",
+    "doc": "doc for 94c60347e4905426805ff826ca2ffa2c",
     "target": {
         "id": "id:policies.test.target_target1",
         "type": "Target",
@@ -18,7 +18,7 @@
     "allowed": {
         "id": "id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
         "type": "Values",
-        "doc": "doc for id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
+        "doc": "doc for 69ad7281f3d45359a06cf8cefb38d1a3",
         "values": [
             {
                 "id": "id:policies.test.value_value1",
@@ -37,7 +37,8 @@
     "denied": {
         "id": "id:NoVals",
         "type": "Values",
-        "doc": "doc for id:NoVals",
+        "doc": "doc for 075c5b88af825533bc09a8e7d3c8d087",
         "values": []
-    }
+    },
+    "implementation": "as_dict"
 }

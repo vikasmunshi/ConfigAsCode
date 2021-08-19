@@ -1,37 +1,37 @@
 {
     "id": "id:compiled.policies.test.paramspolicies_paramspol1",
     "type": "ParamsPolicies",
-    "doc": "doc for id:policies.test.paramspolicies_paramspol1",
+    "doc": "doc for 29f950872cfd5c5998488375f08b7df0",
     "policies": "",
     "expression": "expression: id:NullParamsPolicies + id:policies.test.parampolicy_param1policy + id:policies.test.parampolicy_param1policy2 + id:policies.test.parampolicy_param1policy3",
     "policy": {
         "id": "id:policies.test.paramspolicies_d51a3b16d0c15147bdfc3c09b95a42f2",
         "type": "ParamsPolicies",
-        "doc": "doc for id:NullParamsPolicies",
+        "doc": "doc for 001bb09559ec59b497c286ec48e4ed30",
         "policies": "",
         "expression": "",
         "policy": {
             "id:policies.test.parampolicy_94c60347e4905426805ff826ca2ffa2c": {
                 "id": "id:policies.test.parampolicy_94c60347e4905426805ff826ca2ffa2c",
                 "type": "ParamPolicy",
-                "doc": "doc for id:policies.test.parampolicy_a1ae3939389b5ec8a8e372cd48d48e24 (+) doc for id:policies.test.parampolicy_94c60347e4905426805ff826ca2ffa2c (+) doc for id:policies.test.parampolicy_a1ae3939389b5ec8a8e372cd48d48e24 (+) doc for id:policies.test.parampolicy_94c60347e4905426805ff826ca2ffa2c",
+                "doc": "doc for a1ae3939389b5ec8a8e372cd48d48e24 (+) doc for 94c60347e4905426805ff826ca2ffa2c (+) doc for a1ae3939389b5ec8a8e372cd48d48e24 (+) doc for 94c60347e4905426805ff826ca2ffa2c",
                 "target": {
                     "id": "id:policies.test.target_target1",
                     "type": "Target",
-                    "doc": "doc for id:policies.test.target_target1",
+                    "doc": "doc for target1",
                     "name": "target1",
                     "url": null
                 },
                 "param": {
                     "id": "id:policies.test.param_param1",
                     "type": "Param",
-                    "doc": "doc for id:policies.test.param_param1",
+                    "doc": "doc for param1",
                     "name": "param1"
                 },
                 "allowed": {
                     "id": "id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3",
                     "type": "Values",
-                    "doc": "doc for id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3 (-) doc for id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087 (+) doc for id:NoVals (%) doc for id:policies.test.values_69ad7281f3d45359a06cf8cefb38d1a3 (-) doc for id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087 (+) doc for id:NoVals (-) doc for id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087 (+) doc for id:NoVals (+) doc for id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087 (+) doc for id:NoVals",
+                    "doc": "doc for 69ad7281f3d45359a06cf8cefb38d1a3 (-) doc for 075c5b88af825533bc09a8e7d3c8d087 (+) doc for 075c5b88af825533bc09a8e7d3c8d087 (%) doc for 69ad7281f3d45359a06cf8cefb38d1a3 (-) doc for 075c5b88af825533bc09a8e7d3c8d087 (+) doc for 075c5b88af825533bc09a8e7d3c8d087 (-) doc for 075c5b88af825533bc09a8e7d3c8d087 (+) doc for 075c5b88af825533bc09a8e7d3c8d087 (+) doc for 075c5b88af825533bc09a8e7d3c8d087 (+) doc for 075c5b88af825533bc09a8e7d3c8d087",
                     "values": [
                         {
                             "id": "id:policies.test.value_value1",
@@ -50,9 +50,10 @@
                 "denied": {
                     "id": "id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087",
                     "type": "Values",
-                    "doc": "doc for id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087 (+) doc for id:NoVals (+) doc for id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087 (+) doc for id:NoVals",
+                    "doc": "doc for 075c5b88af825533bc09a8e7d3c8d087 (+) doc for 075c5b88af825533bc09a8e7d3c8d087 (+) doc for 075c5b88af825533bc09a8e7d3c8d087 (+) doc for 075c5b88af825533bc09a8e7d3c8d087",
                     "values": []
-                }
+                },
+                "implementation": "as_dict"
             }
         }
     }
