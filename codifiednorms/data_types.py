@@ -251,17 +251,17 @@ class Param(Serializable):
     possible = attr.ib(type=Values, eq=False, default=AllVals, validator=is_instance_of(Values))
     implementation = attr.ib(type=str, eq=False, default='as_dict', validator=is_instance_of(str))
 
-    @staticmethod
-    def register_implementation(func: typing.Callable[[str, typing.Union[bool, int, str, Specials]], dict[str, str]],
-                                name: str):
-        implementation_repo[name] = func
-
     @property
     def get_implementation(self):
         return lambda v: implementation_repo.get(self.implementation)(self.name, v)
 
 
 implementation_repo = {'as_dict': lambda p, v: {p: v}}
+
+
+def register_implementation(func: typing.Callable[[str, typing.Union[bool, int, str, Specials]], dict[str, str]],
+                            name: str):
+    implementation_repo[name] = func
 
 
 @attr.s(frozen=True)
