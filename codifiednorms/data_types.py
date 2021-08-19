@@ -110,8 +110,8 @@ class Serializable:
     doc = attr.ib(type=str, eq=False, default='', validator=is_instance_of(str))
 
     def __attrs_post_init__(self):
-        obj_name = self.name if hasattr(self, 'name') \
-            else self.value if hasattr(self, 'value') \
+        obj_name = ''.join(self.name.split()) if hasattr(self, 'name') \
+            else ''.join(self.value.split()) if hasattr(self, 'value') \
             else uuid.uuid5(uuid.NAMESPACE_URL, str(attr.asdict(self, filter=lambda a, v: a.eq))).hex
         if self.id == '':
             object.__setattr__(self, 'id', repo.new(f'{self.__class__.__name__.lower()}_{obj_name}'))
@@ -236,7 +236,7 @@ class Values(Serializable):
     def __sub__(self, other: Values) -> typing.Union[Values, Specials]:
         """ remove values from self that are also in other"""
         if self.values is AllValues:
-            values = self
+            values = self.values
         elif other.values is AllValues:
             values = tuple()
         else:
@@ -270,7 +270,8 @@ class ParamPolicy(Param):
             denied = self.denied + other.denied
             allowed = (self.allowed % other.allowed) - denied
             doc = f'{self.doc} (+) {other.doc}'
-            return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
+            name = f'{self.name}+{other.name}'
+            return ParamPolicy(target=self.target, param=self.param, doc=doc, name=name, allowed=allowed, denied=denied)
         return attr.evolve(NullParamsPolicies, policy=FrozenDict({self.id: self, other.id: other}), id='', doc='')
 
     def __sub__(self, other: ParamPolicy) -> ParamPolicy:
@@ -278,7 +279,8 @@ class ParamPolicy(Param):
             allowed = self.allowed + other.allowed
             denied = self.denied - other.allowed
             doc = f'{self.doc} (-) {other.doc}'
-            return ParamPolicy(target=self.target, param=self.param, doc=doc, allowed=allowed, denied=denied)
+            name = f'{self.name}-{other.name}'
+            return ParamPolicy(target=self.target, param=self.param, doc=doc, name=name, allowed=allowed, denied=denied)
         return self
 
     def __bool__(self: ParamPolicy) -> bool:
@@ -350,7 +352,7 @@ class ParamsPolicies(Param):
         return functools.reduce(lambda p, q: p - q, other.policy.values(), self)
 
 
-NullParamsPolicies = ParamsPolicies(id='id:NullParamsPolicies')
+NullParamsPolicies = ParamsPolicies(id='id:NullParamsPolicies', name='Param Policies')
 
 if __name__ == '__main__':
     param1 = Param.load(identifier='id:policies.test.param_param1')
@@ -363,13 +365,11 @@ if __name__ == '__main__':
     # value2.dump()
     values1 = Values.load(identifier='id:policies.test.values_values1')
     values2 = repo.get('id:AllVals')
-    param1policy = ParamPolicy.load(identifier='id:policies.test.parampolicy_param1policy')
-    param1policy2 = ParamPolicy.load(identifier='id:policies.test.parampolicy_param1policy2')
+    param1policy = ParamPolicy.load(identifier='id:policies.test.parampolicy_Param1Policy1')
+    param1policy2 = ParamPolicy.load(identifier='id:policies.test.parampolicy_Param1Policy2')
     param1policy3 = param1policy + param1policy2
-    attr.evolve(param1policy3, id='id:policies.test.parampolicy_param1policy3').dump()
 
-    paramspol1 = ParamsPolicies.load(identifier='id:policies.test.paramspolicies_paramspol1')
-    print(param1policy.get_implementation(value1))
+    paramspol1 = ParamsPolicies.load(identifier='id:policies.test.paramspolicies_ParamPolicies1')
 
     print(repo.list)
     for pid, p in tuple(repo.repo_cache.items()):

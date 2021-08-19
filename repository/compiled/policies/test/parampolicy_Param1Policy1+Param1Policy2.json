@@ -1,5 +1,5 @@
 {
-    "id": "id:compiled.policies.test.parampolicy_param1policy3",
+    "id": "id:compiled.policies.test.parampolicy_Param1Policy1+Param1Policy2",
     "type": "ParamPolicy",
     "doc": "doc for Param1Policy1 (+) doc for Param1Policy1",
     "name": "Param 1 Policy 1+Param 1 Policy 2",

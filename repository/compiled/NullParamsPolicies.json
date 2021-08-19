@@ -1,7 +1,8 @@
 {
     "id": "id:compiled.NullParamsPolicies",
     "type": "ParamsPolicies",
-    "doc": "doc for 001bb09559ec59b497c286ec48e4ed30",
+    "doc": "doc for ParamPolicies",
+    "name": "Param Policies",
     "policies": "",
     "expression": "",
     "policy": {}

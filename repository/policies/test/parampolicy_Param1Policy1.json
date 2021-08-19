@@ -1,7 +1,8 @@
 {
-    "id": "id:compiled.policies.test.parampolicy_a1ae3939389b5ec8a8e372cd48d48e24",
+    "id": "id:policies.test.parampolicy_Param1Policy1",
     "type": "ParamPolicy",
-    "doc": "doc for a1ae3939389b5ec8a8e372cd48d48e24",
+    "doc": "doc for Param1Policy1",
+    "name": "Param 1 Policy 1",
     "target": {
         "id": "id:policies.test.target_target1",
         "type": "Target",

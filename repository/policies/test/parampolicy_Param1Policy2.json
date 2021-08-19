@@ -1,8 +1,8 @@
 {
-    "id": "id:compiled.policies.test.parampolicy_param1policy3",
+    "id": "id:policies.test.parampolicy_Param1Policy1",
     "type": "ParamPolicy",
-    "doc": "doc for Param1Policy1 (+) doc for Param1Policy1",
-    "name": "Param 1 Policy 1+Param 1 Policy 2",
+    "doc": "doc for Param1Policy1",
+    "name": "Param 1 Policy 2",
     "target": {
         "id": "id:policies.test.target_target1",
         "type": "Target",
@@ -19,13 +19,13 @@
     "allowed": {
         "id": "id:policies.test.values_9310f9a1e2e3536caab8fe5b40d56e87",
         "type": "Values",
-        "doc": "doc for 9310f9a1e2e3536caab8fe5b40d56e87 (-) doc for 075c5b88af825533bc09a8e7d3c8d087 (+) doc for 075c5b88af825533bc09a8e7d3c8d087",
+        "doc": "doc for 9310f9a1e2e3536caab8fe5b40d56e87",
         "values": "value:AllValues"
     },
     "denied": {
         "id": "id:policies.test.values_075c5b88af825533bc09a8e7d3c8d087",
         "type": "Values",
-        "doc": "doc for 075c5b88af825533bc09a8e7d3c8d087 (+) doc for 075c5b88af825533bc09a8e7d3c8d087",
+        "doc": "doc for 075c5b88af825533bc09a8e7d3c8d087",
         "values": []
     },
     "implementation": "as_dict"

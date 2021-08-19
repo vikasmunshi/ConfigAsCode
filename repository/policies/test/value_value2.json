@@ -1,6 +1,6 @@
 {
     "id": "id:policies.test.value_value2",
     "type": "Value",
-    "doc": "doc for id:policies.test.value_value2",
+    "doc": "doc for value2",
     "value": "value2"
 }

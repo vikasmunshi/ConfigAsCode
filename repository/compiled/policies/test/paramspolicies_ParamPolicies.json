@@ -1,14 +1,16 @@
 {
-    "id": "id:compiled.policies.test.paramspolicies_421a65d7767c56a99d36795536110814",
+    "id": "id:compiled.policies.test.paramspolicies_ParamPolicies",
     "type": "ParamsPolicies",
-    "doc": "doc for 001bb09559ec59b497c286ec48e4ed30",
+    "doc": "doc for ParamPolicies",
+    "name": "Param Policies",
     "policies": "",
     "expression": "",
     "policy": {
-        "id:policies.test.parampolicy_a1ae3939389b5ec8a8e372cd48d48e24": {
-            "id": "id:policies.test.parampolicy_a1ae3939389b5ec8a8e372cd48d48e24",
+        "id:policies.test.parampolicy_Param1Policy1": {
+            "id": "id:policies.test.parampolicy_Param1Policy1",
             "type": "ParamPolicy",
-            "doc": "doc for a1ae3939389b5ec8a8e372cd48d48e24",
+            "doc": "doc for Param1Policy1",
+            "name": "Param 1 Policy 1",
             "target": {
                 "id": "id:policies.test.target_target1",
                 "type": "Target",
