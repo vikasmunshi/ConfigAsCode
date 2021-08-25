@@ -57,6 +57,9 @@ class Values(RepoCachedAttrs):
     values = attr.ib(type=typing.Tuple[Value, ...], converter=lambda v: tuple(v), factory=tuple,
                      validator=is_tuple_of(Value))
 
+    def __iter__(self):
+        yield from self.values
+
     def __contains__(self, item: Value) -> bool:
         return item.value in self.values
 

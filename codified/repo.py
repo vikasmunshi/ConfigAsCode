@@ -1,7 +1,7 @@
 #!/usr/bin/env python3.9
 # -*- coding: utf-8 -*-
 """
-Base class for other codified attrs classes providing a class method for read and an instance method for write
+Base class for other codified attrs classes providing class methods for read and cast and instance method for write
 """
 from __future__ import annotations
 
@@ -16,9 +16,12 @@ import uuid
 import attr
 
 __all__ = ['RepoCachedAttrs', 'attr']
-
+Callable = typing.Callable
+Any = typing.Any
 T = typing.TypeVar('T')
-is_optional_str = attr.validators.optional(attr.validators.instance_of(str))
+is_instance_of = attr.validators.instance_of
+is_optional_str = attr.validators.optional(is_instance_of(str))
+is_tuple_of: Callable[[Any], None] = lambda t: attr.validators.deep_iterable(is_instance_of(t), is_instance_of(tuple))
 
 __cwd__ = pathlib.Path(os.getcwd())
 if __cwd__.stem == 'repository':
@@ -40,7 +43,7 @@ def __get_path__(obj_id: str) -> str:
 
 
 class RepoCached(abc.ABCMeta):
-    __types__: typing.Dict[str, type] = {}
+    __types__: typing.Dict[str, RepoCached] = {}
     __instances__: typing.Dict[str, object] = {}
 
     def __new__(mcs, name, bases, dct):
@@ -49,36 +52,49 @@ class RepoCached(abc.ABCMeta):
 
     def __object_hook__(cls: typing.Type[T], d: dict) -> T:
         fields = {a.name for a in attr.fields(cls) if a.init}
-        return cls.__types__.get(d.get('type'), dict)(**{k: v for k, v in d.items() if k in fields})
+        return cls(**{k: v for k, v in d.items() if k in fields})
 
-    def read(cls: typing.Type[T], obj_id: str) -> T:
+    @staticmethod
+    def read(obj_id: str) -> T:
         if obj_id not in RepoCached.__instances__:
             with open(__get_path__(obj_id)) as in_file:
-                return json.load(fp=in_file, object_hook=cls.__object_hook__)
+                return json.load(fp=in_file, object_hook=lambda d: RepoCached.__types__[d['type']].__object_hook__(d))
         return RepoCached.__instances__[obj_id]
+
+    def cast(cls: typing.Type[T], d: tuple[typing.Union[T, str, dict, list, tuple], ...]) -> tuple[T, ...]:
+        def c(o):
+            if isinstance(o, cls):
+                return o
+            if isinstance(o, str):
+                return cls.read(o)
+            if isinstance(o, dict):
+                return cls(**o)
+            if isinstance(o, (list, tuple)):
+                return cls(*o)
+            return
+
+        return tuple(v for obj in (d if isinstance(d, (list, tuple)) else (d,)) if isinstance(v := c(obj), cls))
 
 
 @attr.s(frozen=True, kw_only=True)
 class RepoCachedAttrs(metaclass=RepoCached):
     id = attr.ib(type=typing.Optional[str], cmp=False, default=None, validator=is_optional_str)
     type = attr.ib(type=str, init=False)
-    doc = attr.ib(type=typing.Optional[str], cmp=False, default=None, validator=is_optional_str)
+    doc = attr.ib(type=typing.Optional[str], cmp=False, default='', validator=is_instance_of(str))
 
     def __attrs_post_init__(self):
         if self.id is None:
-            obj_dict = attr.asdict(self, filter=lambda a, v: a.eq and v is not None)
-            uid = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(sorted(str(obj_dict)))))
-            object.__setattr__(self, 'id', uid)
+            id_name = self.__class__.__name__.lower()
+            id_content = self.__dict__.get(id_name, '')
+            if isinstance(id_content, tuple):
+                id_content = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(sorted(id_content))))
+            object.__setattr__(self, 'id', f'{id_name}_{id_content}')
         RepoCached.__instances__[self.id] = self
 
     @type.default
     def __type_default__(self) -> str:
         return self.__class__.__name__
 
-    @functools.cached_property
-    def as_dict(self):
-        return attr.asdict(self, filter=lambda a, v: a.repr and v is not None)
-
     def write(self):
         with open(__get_path__(self.id), 'w') as out_file:
-            json.dump(obj=self.as_dict, fp=out_file, indent=4)
+            json.dump(obj=attr.asdict(self, filter=lambda a, v: a.repr), fp=out_file, indent=4)
