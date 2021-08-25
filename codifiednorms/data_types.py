@@ -175,54 +175,35 @@ class Serializable:
 
 
 @attr.s(frozen=True)
-class Param(Serializable):
-    name = attr.ib(type=str, validator=is_instance_of(str))
-
-
-@attr.s(frozen=True)
-class Target(Param):
-    url = attr.ib(type=str, default=None, validator=attr.validators.optional(is_instance_of(str)))
-
-    @url.validator
-    def url_validator(self, attribute, value):
-        if value and not value.startswith('https://'):
-            raise ValueError(f'{value} is not a valid {attribute.name}')
-
-
-@attr.s(frozen=True)
 class Value(Serializable):
-    value = attr.ib(type=typing.Union[bool, int, str], validator=is_instance_of((bool, int, str)))
+    value = attr.ib(type=typing.Union[bool, int, str, Specials], validator=is_instance_of((bool, int, str, Specials)))
 
     def __bool__(self) -> bool:
         return bool(self.value)
 
+    def __matmul__(self, policy: ParamPolicy) -> bool:
+        """ Value @ Policy"""
+        return self in policy.param.possible and self in policy.allowed and self not in policy.denied
+
+    def __pow__(self, policy: ParamPolicy) -> dict[str, str]:
+        """ Value ** Policy"""
+        return policy.param.get_implementation(self.value if self @ policy else NoValue)
+
 
 @attr.s(frozen=True)
 class Values(Serializable):
-    values = attr.ib(type=typing.Union[typing.Tuple[Value, ...], Specials], converter=Value.cast, factory=tuple,
-                     validator=is_instance_of((tuple, Specials)))
-
-    @values.validator
-    def values_validator(self, attribute, value):
-        if isinstance(value, Specials):
-            return
-        errors = ''
-        for v in value:
-            errors += '' if isinstance(v, Value) else f'{v} is not of type Value'
-        if errors:
-            raise ValueError(f'errors in {attribute.name}: {errors.strip()}')
+    values = attr.ib(type=typing.Tuple[Value, ...], converter=Value.cast, factory=tuple,
+                     validator=attr.validators.deep_iterable(is_instance_of(Value), is_instance_of(tuple)))
 
     def __bool__(self) -> bool:
         return bool(self.values)
 
     def __contains__(self, item: Value) -> bool:
         if self.values is AllValues:
-            return item.value == AllValues
+            return item.value == AnyValue
         return item.value in self.values
 
     def __iter__(self) -> typing.Generator[Value, None, None]:
-        if self.values is AllValues:
-            yield from tuple()
         yield from self.values
 
     def __add__(self, other: Values) -> typing.Union[Values, Specials]:
@@ -253,52 +234,66 @@ class Values(Serializable):
         return attr.evolve(self, values=values, doc=f'{self.doc} (%) {other.doc}', id='')
 
 
-AllVals = Values(AllValues, id='id:AllVals')
-NoVals = Values(id='id:NoVals')
+AllVals = Values(values=(Value(AnyValue),), id='id:AllVals')
+NoVals = Values(values=tuple(), id='id:NoVals')
+
+
+@attr.s(frozen=True)
+class Target(Serializable):
+    name = attr.ib(type=str, validator=is_instance_of(str))
+    uri = attr.ib(type=str, default='', eq=False, validator=is_instance_of(str))
+
+
+@attr.s(frozen=True, kw_only=True)
+class Param(Serializable):
+    name = attr.ib(type=str, validator=is_instance_of(str))
+    target = attr.ib(type=Target, validator=is_instance_of(Target))
+    possible = attr.ib(type=Values, eq=False, default=AllVals, validator=is_instance_of(Values))
+    implementation = attr.ib(type=str, eq=False, default='as_dict', validator=is_instance_of(str))
+
+    @property
+    def get_implementation(self):
+        return lambda v: implementation_repo.get(self.implementation)(self.name, v)
+
+
+implementation_repo = {'as_dict': lambda p, v: {p: v}}
+
+
+def register_implementation(func: typing.Callable[[str, typing.Union[bool, int, str, Specials]], dict[str, str]],
+                            name: str):
+    implementation_repo[name] = func
 
 
 @attr.s(frozen=True)
 class ParamPolicy(Param):
-    target = attr.ib(type=Target, converter=Target.cast, validator=is_instance_of(Target))
     param = attr.ib(type=Param, converter=Param.cast, validator=is_instance_of(Param))
     allowed = attr.ib(type=Values, converter=Values.cast, default=AllVals, validator=is_instance_of(Values))
     denied = attr.ib(type=Values, converter=Values.cast, default=NoVals, validator=is_instance_of(Values))
-    implementation = attr.ib(type=str, eq=False, repr=False, default='as_dict', validator=is_instance_of(str))
 
     def __add__(self: ParamPolicy, other: ParamPolicy) -> typing.Union[ParamPolicy, ParamsPolicies]:
-        if self.target == other.target and self.param == other.param:
+        if self.param == other.param:
             denied = self.denied + other.denied
             allowed = (self.allowed % other.allowed) - denied
             doc = f'{self.doc} (+) {other.doc}'
             name = f'{self.name}+{other.name}'
-            return ParamPolicy(target=self.target, param=self.param, doc=doc, name=name, allowed=allowed, denied=denied)
+            return ParamPolicy(target=self.target, param=self.param, id='', doc=doc, name=name,
+                               allowed=allowed, denied=denied)
         return attr.evolve(NullParamsPolicies, policy=FrozenDict({self.id: self, other.id: other}), id='', doc='')
 
     def __sub__(self, other: ParamPolicy) -> ParamPolicy:
-        if self.target == other.target and self.param == other.param:
+        if self.param == other.param:
             allowed = self.allowed + other.allowed
             denied = self.denied - other.allowed
             doc = f'{self.doc} (-) {other.doc}'
             name = f'{self.name}-{other.name}'
-            return ParamPolicy(target=self.target, param=self.param, doc=doc, name=name, allowed=allowed, denied=denied)
+            return ParamPolicy(target=self.target, param=self.param, id='', doc=doc, name=name,
+                               allowed=allowed, denied=denied)
         return self
 
     def __bool__(self: ParamPolicy) -> bool:
         if self.denied is AllValues:
             return False
         return bool(self.allowed - self.denied)
-
-    def __matmul__(self: ParamPolicy, value: Value) -> bool:
-        """ Policy @ Value"""
-        return value in self.allowed and value not in self.denied
-
-    def get_implementation(self, value: Value) -> dict[str, typing.Optional[str]]:
-        as_dict: typing.Callable[[Param, Value], dict[str, str]] = lambda param, value: {param.name: value.value}
-        if self @ value:
-            func = globals().get(self.implementation, as_dict)
-            # noinspection PyArgumentList
-            return func(param=self.param, value=value)
-        return {self.param.name: None}
 
 
 @attr.s(frozen=True)
@@ -352,7 +347,7 @@ class ParamsPolicies(Param):
         return functools.reduce(lambda p, q: p - q, other.policy.values(), self)
 
 
-NullParamsPolicies = ParamsPolicies(id='id:NullParamsPolicies', name='Param Policies')
+NullParamsPolicies = ParamsPolicies(id='id:NullParamsPolicies', name='Param Policies', target=Target(name=AnyValue))
 
 if __name__ == '__main__':
     param1 = Param.load(identifier='id:policies.test.param_param1')
@@ -369,8 +364,8 @@ if __name__ == '__main__':
     param1policy2 = ParamPolicy.load(identifier='id:policies.test.parampolicy_Param1Policy2')
     param1policy3 = param1policy + param1policy2
 
-    paramspol1 = ParamsPolicies.load(identifier='id:policies.test.paramspolicies_ParamPolicies1')
+    params_pol1 = ParamsPolicies.load(identifier='id:policies.test.paramspolicies_ParamPolicies1')
 
     print(repo.list)
-    for pid, p in tuple(repo.repo_cache.items()):
-        p.compile()
+    for pol_id, pol in tuple(repo.repo_cache.items()):
+        pol.compile()
