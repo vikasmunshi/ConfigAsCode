@@ -130,15 +130,15 @@ class Serializable:
         return json.dumps(obj=attr.asdict(self), indent=4)
 
     @classmethod
-    def load(cls: typing.Type[T], identifier: str) -> T:
+    def load(mcs: typing.Type[T], identifier: str) -> T:
         return cls.loads(repo.read(identifier))
 
     @classmethod
-    def loads(cls: typing.Type[T], data: str) -> T:
+    def loads(mcs: typing.Type[T], data: str) -> T:
         return json.loads(s=data, object_hook=lambda d: globals().get(d.pop('type'), lambda **kw: kw)(**d))
 
     @classmethod
-    def cast(cls: typing.Type[T], data: typing.Union[T, typing.Iterable, bool, int, str]) \
+    def cast(mcs: typing.Type[T], data: typing.Union[T, typing.Iterable, bool, int, str]) \
             -> typing.Optional[typing.Union[T, typing.Tuple[T, ...]]]:
         if isinstance(data, cls):
             return data

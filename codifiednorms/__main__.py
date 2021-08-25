@@ -25,7 +25,7 @@ def check_repo(policy_class: type) -> None:
             if policy.is_empty:
                 print(f'NOK {file.relative_to(repo_root)} {policy.id} "is empty"')
                 continue
-            if not policy.as_dict:
+            if not policy.__as_dict__:
                 print(f'NOK {file.relative_to(repo_root)} {policy.id} "cannot be dumped"')
                 continue
             if hasattr(policy, 'inconsistencies') and (errors := policy.inconsistencies) != '':
