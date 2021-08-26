@@ -1,0 +1,6 @@
+{
+    "id": "values~all",
+    "type": "Values",
+    "doc": "special values that contains all values",
+    "values": []
+}

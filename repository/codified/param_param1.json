@@ -1,0 +1,18 @@
+{
+    "id": "codified.param_param1",
+    "type": "Param",
+    "doc": "",
+    "param": "param1",
+    "allowed": {
+        "id": "values~all",
+        "type": "Values",
+        "doc": "special values that contains all values",
+        "values": []
+    },
+    "denied": {
+        "id": "values~none",
+        "type": "Values",
+        "doc": "empty list of values",
+        "values": []
+    }
+}

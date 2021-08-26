@@ -1,0 +1,6 @@
+{
+    "id": "value~any",
+    "type": "Value",
+    "doc": "special value that matches all values",
+    "value": null
+}

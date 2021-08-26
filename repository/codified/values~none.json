@@ -1,0 +1,6 @@
+{
+    "id": "values~none",
+    "type": "Values",
+    "doc": "empty list of values",
+    "values": []
+}

@@ -1,0 +1,11 @@
+{
+    "id": "codified.target_some target",
+    "type": "Target",
+    "doc": "",
+    "target": "some target",
+    "uri": "",
+    "params": [
+        "param1",
+        "param2"
+    ]
+}
