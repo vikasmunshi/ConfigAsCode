@@ -4,9 +4,9 @@
 CLI for package codified
 """
 try:
-    from .variables import *
+    from .repo import *
 except ImportError:
-    from variables import *
+    from repo import *
 
 if __name__ == '__main__':
     base = RepoCachedAttrs.read('some')
@@ -14,5 +14,11 @@ if __name__ == '__main__':
     base.write()
     print(RepoCachedAttrs.__instances__)
     print(RepoCachedAttrs.__types__)
-    print(AllValues().as_dict)
-    print(AnyValue().as_dict)
+    print(any_value)
+    print(v := Value('val1'), v == any_value)
+    any_value.write()
+    all_values.write()
+    print(t := Target(target='target_one'))
+    t.write()
+    p1 = Param.read('codified.param_param1')
+    p1.write()

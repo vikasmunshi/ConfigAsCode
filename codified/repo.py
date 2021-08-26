@@ -6,7 +6,6 @@ Base class for other codified attrs classes providing class methods for read and
 from __future__ import annotations
 
 import abc
-import functools
 import json
 import os
 import pathlib
@@ -15,7 +14,7 @@ import uuid
 
 import attr
 
-__all__ = ['RepoCachedAttrs', 'attr']
+__all__ = ['RepoCachedAttrs', 'Value', 'any_value', 'Values', 'all_values', 'Param', 'Target']
 Callable = typing.Callable
 Any = typing.Any
 T = typing.TypeVar('T')
@@ -42,6 +41,12 @@ def __get_path__(obj_id: str) -> str:
     return str(path)
 
 
+def __abs_id__(obj_id: str) -> str:
+    if '.' in obj_id:
+        return obj_id
+    return str(__cwd__.joinpath(obj_id).relative_to(__root__)).replace('/', '.').replace('\\', '.')
+
+
 class RepoCached(abc.ABCMeta):
     __types__: typing.Dict[str, RepoCached] = {}
     __instances__: typing.Dict[str, object] = {}
@@ -51,11 +56,15 @@ class RepoCached(abc.ABCMeta):
         return t
 
     def __object_hook__(cls: typing.Type[T], d: dict) -> T:
-        fields = {a.name for a in attr.fields(cls) if a.init}
-        return cls(**{k: v for k, v in d.items() if k in fields})
+        try:
+            return RepoCached.__instances__[d['id']]
+        except KeyError:
+            fields = {a.name for a in attr.fields(cls) if a.init}
+            return cls(**{k: v for k, v in d.items() if k in fields})
 
     @staticmethod
     def read(obj_id: str) -> T:
+        obj_id = __abs_id__(obj_id)
         if obj_id not in RepoCached.__instances__:
             with open(__get_path__(obj_id)) as in_file:
                 return json.load(fp=in_file, object_hook=lambda d: RepoCached.__types__[d['type']].__object_hook__(d))
@@ -66,7 +75,10 @@ class RepoCached(abc.ABCMeta):
             if isinstance(o, cls):
                 return o
             if isinstance(o, str):
-                return cls.read(o)
+                try:
+                    return cls.read(o)
+                except FileNotFoundError:
+                    return cls(o)
             if isinstance(o, dict):
                 return cls(**o)
             if isinstance(o, (list, tuple)):
@@ -82,15 +94,6 @@ class RepoCachedAttrs(metaclass=RepoCached):
     type = attr.ib(type=str, init=False)
     doc = attr.ib(type=typing.Optional[str], cmp=False, default='', validator=is_instance_of(str))
 
-    def __attrs_post_init__(self):
-        if self.id is None:
-            id_name = self.__class__.__name__.lower()
-            id_content = self.__dict__.get(id_name, '')
-            if isinstance(id_content, tuple):
-                id_content = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(sorted(id_content))))
-            object.__setattr__(self, 'id', f'{id_name}_{id_content}')
-        RepoCached.__instances__[self.id] = self
-
     @type.default
     def __type_default__(self) -> str:
         return self.__class__.__name__
@@ -98,3 +101,65 @@ class RepoCachedAttrs(metaclass=RepoCached):
     def write(self):
         with open(__get_path__(self.id), 'w') as out_file:
             json.dump(obj=attr.asdict(self, filter=lambda a, v: a.repr), fp=out_file, indent=4)
+
+    def __attrs_post_init__(self):
+        if self.id is None or ':' not in self.id:
+            id_name = self.__class__.__name__.lower()
+            id_content = self.__dict__.get(id_name)
+            if id_content is None:
+                id_content = str(uuid.uuid5(uuid.NAMESPACE_DNS,
+                                            str(sorted(str(attr.asdict(self, filter=lambda a, v: a.eq and a.init))))))
+            if isinstance(id_content, tuple):
+                id_content = str(uuid.uuid5(uuid.NAMESPACE_DNS, str(sorted(id_content))))
+            object.__setattr__(self, 'id', __abs_id__(f'{id_name}_{id_content}'))
+        RepoCached.__instances__[self.id] = self
+
+
+@attr.s(frozen=True, cmp=False)
+class Value(RepoCachedAttrs):
+    value = attr.ib(type=typing.Optional[typing.Union[bool, int, str]],
+                    validator=attr.validators.optional(attr.validators.instance_of((bool, int, str))))
+
+    def __eq__(self: Value, other: Value) -> bool:
+        if self is any_value or other is any_value:
+            return True
+        return self.value == other.value
+
+    def __ne__(self: Value, other: Value) -> bool:
+        if self is any_value or other is any_value:
+            return False
+        return self.value != other.value
+
+
+any_value = Value(id='value:any', value=None, doc='special value that matches all values')
+
+
+@attr.s(frozen=True)
+class Values(RepoCachedAttrs):
+    values = attr.ib(type=typing.Tuple[Value, ...], converter=Value.cast, default=(), validator=is_tuple_of(Value))
+
+    def __iter__(self):
+        yield from self.values
+
+    def __contains__(self, item: Value) -> bool:
+        if self is all_values:
+            return True
+        return item.value in self.values
+
+
+all_values = Values(id='values:all', doc='special values that contains all values')
+no_values = Values(id='values:none', doc='empty list of values')
+
+
+@attr.s(frozen=True)
+class Param(RepoCachedAttrs):
+    param = attr.ib(type=str, validator=is_instance_of(str))
+    allowed = attr.ib(type=Values, default=all_values, validator=is_instance_of(Values))
+    denied = attr.ib(type=Values, default=no_values, validator=is_instance_of(Values))
+
+
+@attr.s(frozen=True, kw_only=True)
+class Target(RepoCachedAttrs):
+    target = attr.ib(type=str, validator=attr.validators.instance_of(str))
+    uri = attr.ib(type=str, cmp=False, default='', validator=is_optional_str)
+    params = attr.ib(type=tuple[Param, ...], default=(), validator=is_tuple_of(Param))
