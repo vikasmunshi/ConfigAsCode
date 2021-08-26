@@ -14,7 +14,7 @@ import uuid
 
 import attr
 
-__all__ = ['RepoCachedAttrs', 'Value', 'any_value', 'Values', 'all_values', 'Param', 'Target']
+__all__ = ['RepoCachedAttrs', 'Value', 'any_value', 'Values', 'all_values', 'no_values', 'Target']
 Callable = typing.Callable
 Any = typing.Any
 T = typing.TypeVar('T')
@@ -103,7 +103,7 @@ class RepoCachedAttrs(metaclass=RepoCached):
             json.dump(obj=attr.asdict(self, filter=lambda a, v: a.repr), fp=out_file, indent=4)
 
     def __attrs_post_init__(self):
-        if self.id is None or ':' not in self.id:
+        if self.id is None or '~' not in self.id:
             id_name = self.__class__.__name__.lower()
             id_content = self.__dict__.get(id_name)
             if id_content is None:
@@ -131,7 +131,7 @@ class Value(RepoCachedAttrs):
         return self.value != other.value
 
 
-any_value = Value(id='value:any', value=None, doc='special value that matches all values')
+any_value = Value(id='value~any', value=None, doc='special value that matches all values')
 
 
 @attr.s(frozen=True)
@@ -147,19 +147,30 @@ class Values(RepoCachedAttrs):
         return item.value in self.values
 
 
-all_values = Values(id='values:all', doc='special values that contains all values')
-no_values = Values(id='values:none', doc='empty list of values')
+all_values = Values(id='values~all', doc='special values that contains all values')
+no_values = Values(id='values~none', doc='empty list of values')
+
+
+@attr.s(frozen=True)
+class Target(RepoCachedAttrs):
+    target = attr.ib(type=str, validator=is_instance_of(str))
+    uri = attr.ib(type=str, cmp=False, default='', validator=is_optional_str)
+    params = attr.ib(type=tuple[str, ...], default=(), converter=tuple, validator=is_instance_of(str))
 
 
 @attr.s(frozen=True)
 class Param(RepoCachedAttrs):
     param = attr.ib(type=str, validator=is_instance_of(str))
+    target = attr.ib(type=Target, validator=is_instance_of(Target))
+
+
+@attr.s(frozen=True)
+class Policy(RepoCachedAttrs):
+    policy = attr.ib(type=str, validator=is_instance_of(str))
+    param = attr.ib(type=Param, validator=is_instance_of(Param))
     allowed = attr.ib(type=Values, default=all_values, validator=is_instance_of(Values))
     denied = attr.ib(type=Values, default=no_values, validator=is_instance_of(Values))
 
-
-@attr.s(frozen=True, kw_only=True)
-class Target(RepoCachedAttrs):
-    target = attr.ib(type=str, validator=attr.validators.instance_of(str))
-    uri = attr.ib(type=str, cmp=False, default='', validator=is_optional_str)
-    params = attr.ib(type=tuple[Param, ...], default=(), validator=is_tuple_of(Param))
+# @attr.s(frozen=True)
+# class Target(Target):
+#     params = attr.ib(type=tuple[Param, ...], default=(), validator=is_tuple_of(Param))
