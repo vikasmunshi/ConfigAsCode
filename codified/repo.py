@@ -14,7 +14,7 @@ import uuid
 
 import attr
 
-__all__ = ['RepoCachedAttrs', 'Value', 'any_value', 'Values', 'all_values', 'no_values', 'Target']
+__all__ = ['RepoCachedAttrs', 'Value', 'Values', 'all_values', 'no_values', 'Policy', 'Param', 'Target']
 Callable = typing.Callable
 Any = typing.Any
 T = typing.TypeVar('T')
@@ -115,23 +115,14 @@ class RepoCachedAttrs(metaclass=RepoCached):
         RepoCached.__instances__[self.id] = self
 
 
-@attr.s(frozen=True, cmp=False)
+@attr.s(frozen=True)
 class Value(RepoCachedAttrs):
     value = attr.ib(type=typing.Optional[typing.Union[bool, int, str]],
                     validator=attr.validators.optional(attr.validators.instance_of((bool, int, str))))
 
-    def __eq__(self: Value, other: Value) -> bool:
-        if self is any_value or other is any_value:
-            return True
-        return self.value == other.value
-
-    def __ne__(self: Value, other: Value) -> bool:
-        if self is any_value or other is any_value:
-            return False
-        return self.value != other.value
-
-
-any_value = Value(id='value~any', value=None, doc='special value that matches all values')
+    def __matmul__(self: Value, policy: Policy) -> bool:
+        """ value @ policy"""
+        return self.value in policy.allowed and self.value not in policy.denied
 
 
 @attr.s(frozen=True)
@@ -151,26 +142,39 @@ all_values = Values(id='values~all', doc='special values that contains all value
 no_values = Values(id='values~none', doc='empty list of values')
 
 
-@attr.s(frozen=True)
-class Target(RepoCachedAttrs):
-    target = attr.ib(type=str, validator=is_instance_of(str))
-    uri = attr.ib(type=str, cmp=False, default='', validator=is_optional_str)
-    params = attr.ib(type=tuple[str, ...], default=(), converter=tuple, validator=is_instance_of(str))
+@attr.s(frozen=True, kw_only=True)
+class Policy(RepoCachedAttrs):
+    policy = attr.ib(type=str, default='deny-all', validator=is_instance_of(str))
+    allowed = attr.ib(type=Values, default=no_values, converter=Value.cast, validator=is_instance_of(Values))
+    denied = attr.ib(type=Values, default=all_values, converter=Value.cast, validator=is_instance_of(Values))
+
+    def __matmul__(self: Policy, value: Value) -> bool:
+        """ policy @ value """
+        val = value.value if isinstance(value, Value) else value
+        return val in self.allowed and val not in self.denied
+
+    def __add__(self: Policy, other: Policy) -> Policy:
+        """ p = p1 + p2 => for any value v: p @ v == (p1 + p2) @ v """
+        if self.denied is all_values or other.denied is all_values:
+            denied = all_values
+        else:
+            denied = self.denied + tuple(v for v in other.denied if v not in self.denied)
+        if self.allowed is all_values or other.allowed is all_values:
+            allowed = all_values
+        else:
+            allowed = tuple(v for v in self.allowed if v in other.allowed and v not in denied)
+        return Policy(doc=f'policy {self.id} plus {other.id}:\n{self.doc}\n{other.doc}',
+                      policy=f'{self.policy}+{other.policy}', allowed=allowed, denied=denied, )
 
 
 @attr.s(frozen=True)
 class Param(RepoCachedAttrs):
     param = attr.ib(type=str, validator=is_instance_of(str))
-    target = attr.ib(type=Target, validator=is_instance_of(Target))
+    policy = attr.ib(type=Policy, factory=Policy, validator=is_instance_of(Policy))
 
 
 @attr.s(frozen=True)
-class Policy(RepoCachedAttrs):
-    policy = attr.ib(type=str, validator=is_instance_of(str))
-    param = attr.ib(type=Param, validator=is_instance_of(Param))
-    allowed = attr.ib(type=Values, default=all_values, validator=is_instance_of(Values))
-    denied = attr.ib(type=Values, default=no_values, validator=is_instance_of(Values))
-
-# @attr.s(frozen=True)
-# class Target(Target):
-#     params = attr.ib(type=tuple[Param, ...], default=(), validator=is_tuple_of(Param))
+class Target(RepoCachedAttrs):
+    target = attr.ib(type=str, validator=is_instance_of(str))
+    uri = attr.ib(type=str, cmp=False, default='', validator=is_instance_of(str))
+    params = attr.ib(type=tuple[Param, ...], default=(), converter=Param.cast, validator=is_instance_of(Param))
