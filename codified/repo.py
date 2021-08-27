@@ -6,6 +6,7 @@ Base class for other codified attrs classes providing class methods for read and
 from __future__ import annotations
 
 import abc
+import functools
 import json
 import os
 import pathlib
@@ -142,7 +143,7 @@ all_values = Values(id='values~all', doc='special values that contains all value
 no_values = Values(id='values~none', doc='empty list of values')
 
 
-@attr.s(frozen=True, kw_only=True)
+@attr.s(frozen=True)
 class Policy(RepoCachedAttrs):
     policy = attr.ib(type=str, default='deny-all', validator=is_instance_of(str))
     allowed = attr.ib(type=Values, default=no_values, converter=Value.cast, validator=is_instance_of(Values))
@@ -166,11 +167,34 @@ class Policy(RepoCachedAttrs):
         return Policy(doc=f'policy {self.id} plus {other.id}:\n{self.doc}\n{other.doc}',
                       policy=f'{self.policy}+{other.policy}', allowed=allowed, denied=denied, )
 
+    @classmethod
+    def cast(cls: typing.Type[T], d: tuple[typing.Union[T, str, dict, list, tuple], ...]) -> T:
+        if isinstance(d, cls):
+            return d
+        if isinstance(d, str):
+            if '+' in d:
+                return cls.cast(tuple(p.strip() for p in d.split('+')))
+            try:
+                return cls.read(d)
+            except FileNotFoundError:
+                return cls(d)
+        if isinstance(d, dict):
+            return cls(**d)
+        if isinstance(d, (list, tuple)):
+            return functools.reduce(lambda p1, p2: p1 + p2, (cls.cast(p) for p in d))
+        return cls()
+
 
 @attr.s(frozen=True)
 class Param(RepoCachedAttrs):
     param = attr.ib(type=str, validator=is_instance_of(str))
-    policy = attr.ib(type=Policy, factory=Policy, validator=is_instance_of(Policy))
+    policy = attr.ib(type=Policy, factory=Policy, converter=Policy.cast, validator=is_instance_of(Policy))
+
+
+@attr.s(frozen=True)
+class Assigned(RepoCachedAttrs):
+    param = attr.ib(type=Param, converter=Param.cast, validator=is_instance_of(Param))
+    assigned = attr.ib(type=Value, converter=Value.cast, validator=is_instance_of(Value))
 
 
 @attr.s(frozen=True)
@@ -178,3 +202,9 @@ class Target(RepoCachedAttrs):
     target = attr.ib(type=str, validator=is_instance_of(str))
     uri = attr.ib(type=str, cmp=False, default='', validator=is_instance_of(str))
     params = attr.ib(type=tuple[Param, ...], default=(), converter=Param.cast, validator=is_instance_of(Param))
+
+
+@attr.s(frozen=True)
+class Config(RepoCachedAttrs):
+    config = attr.ib(type=str, validator=is_instance_of(str))
+    targets = attr.ib(type=tuple[Target, ...], default=(), converter=Target.cast, validator=is_instance_of(Target))
