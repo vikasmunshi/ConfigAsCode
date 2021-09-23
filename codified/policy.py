@@ -30,40 +30,46 @@ class PolicyMeta(type):
 
     def __new__(mcs, name: str, bases: typing.Tuple, dct: dict):
         if bases:
-            dct['namespace'], mcs.repo[name] = name, tuple()
+            dct['namespace'], mcs.repo[name] = name, {}
         return super().__new__(mcs, name, bases, dct)
+
+    def __call__(cls, *args, **kwargs):
+        policy = super().__call__(*args, **kwargs)
+        if (param := policy.param) not in cls.repo[cls.namespace]:
+            cls.repo[cls.namespace][param] = {}
+        cls.repo[cls.namespace][param][policy.id] = policy
+        return policy
 
     def from_dict(cls, dct: dict) -> T:
         obj_class = globals().get(dct.get('namespace', cls.__name__))
-        return obj_class(param=dct['param'], allowed=dct['allowed'], blocked=dct['blocked'])
+        return obj_class(param=dct['param'], allowed=dct.get('allowed', Any), blocked=dct.get('blocked', set()))
 
     @property
-    def policies(cls) -> typing.Tuple[Policy]:
+    def policies(cls) -> typing.Dict[str, typing.Dict[str, Policy]]:
         return cls.repo[cls.namespace]
 
     def check(cls, param: str, value: ValueType) -> typing.Optional[bool]:
-        if policies := [p for p in cls.policies if p.param == param]:
-            return all(value in p.allowed and value not in p.blocked for p in policies)
+        if policies := cls.policies.get(param):
+            return all(value in p.allowed and value not in p.blocked for p in policies.values())
 
-    def explain(cls, param: str, value: ValueType) -> typing.Optional[str]:
+    def explain(cls, param: str, value: ValueType) -> str:
         legend = {True: 'passed', False: 'failed'}
-        return '\n'.join(f'{p}: {legend[value in p.allowed and value not in p.blocked]}'
-                         for p in cls.policies if p.param == param) or None
+        return '\n'.join(f"{p}:{value}:{legend[value in p.allowed and value not in p.blocked]}"
+                         for p in cls.policies.get(param, {}).values()) or f'{cls.namespace}:{param}:no policy'
 
 
 class Policy(metaclass=PolicyMeta):
     def __init__(self, param: str, allowed: ValuesInputType = Any, blocked: ValuesInputType = None, id: str = None):
         if self.__class__ is Policy:
             raise NotImplementedError('Must be subclassed!')
-        self.id = id if id is not None else f'{self.__class__.__name__}_{len(self.__class__.policies) + 1}'
+        self.id = id if id is not None else f'{self.__class__.__name__}_{len(self.__class__.policies.get(param, {}))}'
         self.param = param
         self.allowed = Any if (allowed == 'Any' or allowed is Any) else set(allowed)
         self.blocked = set(blocked) if blocked is not None else set()
-        self.__class__.repo[self.__class__.namespace] += (self,)
 
     def as_dict(self) -> dict:
         # noinspection PyUnboundLocalVariable
         return {a: v for a in dir(self) if (not a.startswith('__') and not callable(v := getattr(self, a)))}
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({', '.join(f'{k}={v}' for k, v in self.__dict__.items())})"
+        return f"{self.__class__.__name__}({', '.join(f'{k}={v}' for k, v in self.as_dict().items())})"
