@@ -77,26 +77,3 @@ class Policy(metaclass=PolicyMeta):
     def __repr__(self):
         vals = ', '.join(f'{k}={v}' for k, v in self.as_dict().items())
         return f'{self.__class__.__name__}({vals})'
-
-
-class ASRPolicy(Policy):
-    doc = 'some doc'
-
-
-class AuthPolicy(Policy):
-    doc = 'some doc'
-
-
-if __name__ == '__main__':
-    print(asr := ASRPolicy(param='p1'))
-    print(asr.as_dict())
-    print(ASRPolicy.from_dict(asr.as_dict()))
-    print(ASRPolicy.check_policies('p1', 'some value'))
-    print(ASRPolicy.explain_policies('p1', 'some value'))
-    print(ASRPolicy.check_policies('p2', 'some value'))
-    print(ASRPolicy.explain_policies('p2', 'some value'))
-    try:
-        print(Policy(param='p1', allowed='Any', blocked=[]))
-    except NotImplementedError:
-        print('fine')
-    print(Policy.repo)
