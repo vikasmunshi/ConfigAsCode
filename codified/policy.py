@@ -48,14 +48,14 @@ class PolicyMeta(type):
     def policies(cls) -> typing.Dict[str, typing.Dict[str, Policy]]:
         return cls.repo[cls.namespace]
 
-    def check(cls, param: str, value: ValueType) -> typing.Optional[bool]:
+    def check_policies(cls, param: str, value: ValueType) -> typing.Optional[bool]:
         if policies := cls.policies.get(param):
-            return all(value in p.allowed and value not in p.blocked for p in policies.values())
+            return all(p.check_policy(value) for p in policies.values())
 
-    def explain(cls, param: str, value: ValueType) -> str:
+    def explain_policies(cls, param: str, value: ValueType) -> str:
         legend = {True: 'passed', False: 'failed'}
-        return '\n'.join(f"{p}:{value}:{legend[value in p.allowed and value not in p.blocked]}"
-                         for p in cls.policies.get(param, {}).values()) or f'{cls.namespace}:{param}:no policy'
+        return '\n'.join(f'{p}:{value}:{legend[p.check_policy(value)]}' for p in cls.policies.get(param, {}).values()) \
+               or f'{cls.namespace}:{param}:no policy'
 
 
 class Policy(metaclass=PolicyMeta):
@@ -67,9 +67,36 @@ class Policy(metaclass=PolicyMeta):
         self.allowed = Any if (allowed == 'Any' or allowed is Any) else set(allowed)
         self.blocked = set(blocked) if blocked is not None else set()
 
+    def check_policy(self, value: ValueType) -> bool:
+        return value in self.allowed and value not in self.blocked
+
     def as_dict(self) -> dict:
         # noinspection PyUnboundLocalVariable
         return {a: v for a in dir(self) if (not a.startswith('__') and not callable(v := getattr(self, a)))}
 
     def __repr__(self):
-        return f"{self.__class__.__name__}({', '.join(f'{k}={v}' for k, v in self.as_dict().items())})"
+        vals = ', '.join(f'{k}={v}' for k, v in self.as_dict().items())
+        return f'{self.__class__.__name__}({vals})'
+
+
+class ASRPolicy(Policy):
+    doc = 'some doc'
+
+
+class AuthPolicy(Policy):
+    doc = 'some doc'
+
+
+if __name__ == '__main__':
+    print(asr := ASRPolicy(param='p1'))
+    print(asr.as_dict())
+    print(ASRPolicy.from_dict(asr.as_dict()))
+    print(ASRPolicy.check_policies('p1', 'some value'))
+    print(ASRPolicy.explain_policies('p1', 'some value'))
+    print(ASRPolicy.check_policies('p2', 'some value'))
+    print(ASRPolicy.explain_policies('p2', 'some value'))
+    try:
+        print(Policy(param='p1', allowed='Any', blocked=[]))
+    except NotImplementedError:
+        print('fine')
+    print(Policy.repo)
