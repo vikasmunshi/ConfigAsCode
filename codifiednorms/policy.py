@@ -195,7 +195,7 @@ class Policy(BasePolicy):
                 errors += f'param {param} is required to be assigned, required params are: {self.required}\n'
         return errors.strip()
 
-    def policy_arithematic_checks(self: Policy, other: Policy) -> None:
+    def policy_arithmetic_checks(self: Policy, other: Policy) -> None:
         if not (isinstance(self, Policy) and isinstance(other, Policy)):
             return NotImplemented(f'Cannot add/subtract non-Policy types "{type(self)}" and "{type(other)}"')
         errors = ''
@@ -206,11 +206,12 @@ class Policy(BasePolicy):
         if errors:
             return NotImplemented(errors)
 
-    def __add__(self: Policy, other: typing.Union[Policy, PolicySet]) -> typing.Union[Policy, FrozenDict[str, Policy]]:
+    def __add__(self: Policy, other: typing.Union[Policy, PolicySet]) -> \
+            typing.Union[Policy, FrozenDict[str, Policy], PolicySet]:
         if isinstance(other, PolicySet):
             return other + self
 
-        self.policy_arithematic_checks(other)
+        self.policy_arithmetic_checks(other)
 
         if self.target != other.target:
             return PolicySet.from_dict(dict(
@@ -242,7 +243,8 @@ class Policy(BasePolicy):
             required=union(self.required, other.required),
             possible=intersection(self.possible, other.possible)))
 
-    def __sub__(self: Policy, other: typing.Union[Policy, PolicySet]) -> typing.Union[Policy, FrozenDict[str, Policy]]:
+    def __sub__(self: Policy, other: typing.Union[Policy, PolicySet]) \
+            -> typing.Union[Policy, FrozenDict[str, Policy], PolicySet]:
         if isinstance(other, PolicySet):
             return PolicySet.from_dict(dict(
                 name=f'{self.proper_name}',
@@ -254,7 +256,7 @@ class Policy(BasePolicy):
                 policies=(self.id,),
                 exemptions=tuple(), )) - other
 
-        self.policy_arithematic_checks(other)
+        self.policy_arithmetic_checks(other)
 
         if not (other.allowed and all(not getattr(other, o) for o in ('blocked', 'enforced', 'required', 'possible'))):
             offending = tuple(k for k in ('blocked', 'enforced', 'required', 'possible') if getattr(other, k))
@@ -323,7 +325,7 @@ class PolicySet(BasePolicy):
                 target: functools.reduce(lambda x, y: x - y, exemptions.get(target, []),
                                          functools.reduce(lambda x, y: x + y, policies[target]))
                 for target in policies.keys()})
-        except AttributeError as e:
+        except AttributeError:
             return FrozenDict({})
 
     @functools.cached_property
@@ -344,7 +346,7 @@ class PolicySet(BasePolicy):
                 else (self.policy.get(target) or other.policy[target])
             for target in union(self.policy.keys(), other.policy.keys())})
 
-    def __sub__(self: PolicySet, other: typing.Union[Policy, PolicySet]) -> PolicySet:
+    def __sub__(self: PolicySet, other: typing.Union[Policy, PolicySet]) -> FrozenDict[str, Policy]:
         return FrozenDict({target: policy - other.policy[target] if target in other.policy else policy
                            for target, policy in self.policy.items()})
 

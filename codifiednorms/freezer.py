@@ -9,6 +9,7 @@ import types
 import typing
 
 
+# noinspection PyProtectedMember,PyUnresolvedReferences
 def _find_type_origin(type_hint):
     if isinstance(type_hint, typing._SpecialForm):
         return
@@ -29,7 +30,7 @@ def _check_types(parameters, hints):
                             f" but received type '{type(value)}' instead")
 
 
-def enforce_types(callable):
+def enforce_types(decorated_func):
     def decorate(func):
         hints = typing.get_type_hints(func)
         func_signature = inspect.signature(func)
@@ -44,14 +45,14 @@ def enforce_types(callable):
 
         return wrapper
 
-    if inspect.isclass(callable):
-        callable.__init__ = decorate(callable.__init__)
-        return callable
+    if inspect.isclass(decorated_func):
+        decorated_func.__init__ = decorate(decorated_func.__init__)
+        return decorated_func
 
-    return decorate(callable)
+    return decorate(decorated_func)
 
 
-def enforce_strict_types(callable):
+def enforce_strict_types(decorated_func):
     def decorate(func):
         hints = typing.get_type_hints(func)
         func_signature = inspect.signature(func)
@@ -68,11 +69,11 @@ def enforce_strict_types(callable):
 
         return wrapper
 
-    if inspect.isclass(callable):
-        callable.__init__ = decorate(callable.__init__)
-        return callable
+    if inspect.isclass(decorated_func):
+        decorated_func.__init__ = decorate(decorated_func.__init__)
+        return decorated_func
 
-    return decorate(callable)
+    return decorate(decorated_func)
 
 
 class FrozenDict(dict):
@@ -98,6 +99,7 @@ class FrozenDict(dict):
     def setdefault(self, *args, **kwargs):
         return NotImplemented('FrozenDict Object is Immutable')
 
+    # noinspection PyPep8Naming
     def update(self, E=None, **F):
         return NotImplemented('FrozenDict Object is Immutable')
 

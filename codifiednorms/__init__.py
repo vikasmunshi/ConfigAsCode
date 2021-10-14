@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 __doc__ = "Python3 library to Manage Codified Norms and Config as Code"
 __package__ = 'codifiednorms'
-__version__ = '0.2.20210811'
+__version__ = '0.2.20211014'
 
 from .policy import *
 

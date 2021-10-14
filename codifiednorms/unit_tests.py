@@ -1,11 +1,12 @@
+import typing
 from dataclasses import FrozenInstanceError
 from functools import reduce
 from itertools import groupby
 from pathlib import Path
 from unittest import TestCase, main
 
-from freezer import FrozenDict
-from policy import BasePolicy, Policy, PolicySet, ls_repo
+from .freezer import FrozenDict
+from .policy import BasePolicy, Policy, PolicySet, ls_repo
 
 b1 = BasePolicy.from_dict(dict(name='test base policy 0', version='1', doc='test doc 1',
                                target='https=//test.com', location='test', type='BasePolicy'))
@@ -93,7 +94,7 @@ class ConfigAsCodeTests(TestCase):
             self.assertEqual(policy, Policy.get(pid))
 
     def test_PolicyArithmetic(self):
-        key = lambda i: i.target
+        key: typing.Callable = lambda i: i.target
         policies = {k: list(v) for k, v in groupby(sorted(Policy.get_cached_repo().values(), key=key), key=key)}
         for target in policies.keys():
             policy = reduce(lambda x, y: x + y, policies[target])

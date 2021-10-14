@@ -7,14 +7,14 @@ from .policy import *
 
 
 @enforce_strict_types
-def list_repo(policy_class: type) -> None:
+def list_repo(policy_class: BasePolicy) -> None:
     for policy_type in (policy_class, *policy_class.__subclasses__()):
         for _, policy in policy_type.get_cached_repo().items():
             print(f'{policy.id} {policy.type} "{policy.proper_name}"')
 
 
 @enforce_strict_types
-def check_repo(policy_class: type) -> None:
+def check_repo(policy_class: BasePolicy) -> None:
     for file in ls_repo():
         try:
             with open(file) as in_file:
@@ -50,7 +50,7 @@ def check_repo(policy_class: type) -> None:
 
 
 @enforce_strict_types
-def fix_repo(policy_class: type) -> None:
+def fix_repo() -> None:
     updated = {}
     policy_repos = {c.__name__: [] for c in (BasePolicy, *BasePolicy.__subclasses__())}
     for file in ls_repo():
@@ -63,15 +63,16 @@ def fix_repo(policy_class: type) -> None:
         except (IOError, json.JSONDecodeError, KeyError, UnicodeDecodeError):
             pass
 
-    def update(file: pathlib.Path, policy_data: dict, policy: BasePolicy) -> None:
-        if (old_id := policy_data.get('id')) != policy.id or policy_data.get('location') != policy.location:
-            policy.dump(file)
-            print(f'updated policy file "{file.relative_to(repo_root)}"', end=' ')
+    def update(policy_file: pathlib.Path, current_policy_data: dict, current_policy: BasePolicy) -> None:
+        if (old_id := current_policy_data.get('id')) != current_policy.id \
+                or current_policy_data.get('location') != current_policy.location:
+            current_policy.dump(policy_file)
+            print(f'updated policy file "{policy_file.relative_to(repo_root)}"', end=' ')
             if old_id:
-                updated[old_id] = policy.id
-                print(f'id "{old_id}" -> "{policy.id}"')
+                updated[old_id] = current_policy.id
+                print(f'id "{old_id}" -> "{current_policy.id}"')
             else:
-                print(f'file "{file.relative_to(repo_root)}" -> "{policy.id}"')
+                print(f'file "{policy_file.relative_to(repo_root)}" -> "{current_policy.id}"')
 
     for file, policy_data, policy in policy_repos['BasePolicy'] + policy_repos['Policy']:
         update(file, policy_data, policy)
@@ -91,7 +92,7 @@ def fix_repo(policy_class: type) -> None:
 
 
 @enforce_types
-def create_new(policy_class: type) -> None:
+def create_new(policy_class: BasePolicy) -> None:
     ts = str(int(time.time()))
     path = pathlib.Path(os.getcwd()).joinpath(f'{policy_class.__name__}_{ts}.json')
     if repo_root in path.parents:
@@ -104,6 +105,7 @@ def create_new(policy_class: type) -> None:
 
 if __name__ == '__main__':
     import argparse
+    # noinspection PyProtectedMember
     from .__init__ import __doc__, __package__, __version__
 
     funcs = {'list': list_repo, 'check': check_repo, 'fix': fix_repo, 'new': create_new}
