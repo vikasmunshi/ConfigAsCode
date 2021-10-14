@@ -25,7 +25,7 @@ def _check_types(parameters, hints):
     for name, value in parameters.items():
         type_hint = hints.get(name, typing.Any)
         actual_types = tuple(_find_type_origin(type_hint))
-        if actual_types and not isinstance(value, actual_types):
+        if actual_types and (not isinstance(value, actual_types)) and (value not in actual_types):
             raise TypeError(f"Expected type '{type_hint}' for argument '{name}'"
                             f" but received type '{type(value)}' instead")
 
